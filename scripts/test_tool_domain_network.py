@@ -31,14 +31,39 @@ async def _run() -> None:
         raise AssertionError("Un port non numérique doit être refusé.")
 
     hosts, blocked = network._net_targets(
-        "192.0.2.0/24", confirmed=False, max_hosts=256
+        "192.0.2.0/24", max_hosts=64
     )
     assert not hosts
-    assert blocked and blocked["requiresConfirmation"] is True
+    assert blocked and blocked["needsClarification"] is True
+    assert "requiresConfirmation" not in blocked
     hosts, blocked = network._net_targets(
-        "192.0.2.0/30", confirmed=False, max_hosts=64
+        "192.0.2.0/30", max_hosts=64
     )
     assert hosts == ["192.0.2.1", "192.0.2.2"] and blocked is None
+
+    arp_process = subprocess.CompletedProcess(
+        ["arp", "-a"],
+        0,
+        stdout=(
+            b"  192.168.1.12  aa-bb-cc-dd-ee-01 dynamic\r\n"
+            b"  192.168.1.255 ff-ff-ff-ff-ff-ff static\r\n"
+            b"  224.0.0.22 01-00-5e-00-00-16 static\r\n"
+        ),
+        stderr=b"",
+    )
+    with patch.object(network.subprocess, "run", return_value=arp_process):
+        arp = await network.execute_net_scan_local({})
+    assert arp["count"] == 1
+    assert arp["devices"][0]["ip"] == "192.168.1.12"
+    assert arp["excluded_entries"] == 2
+    assert arp["discovery_mode"] == "passive_cache"
+    assert "raw" not in arp
+
+    too_large = await network.execute_net_nmap_scan(
+        {"target": "192.0.2.0/24", "profile": "top100", "confirmed": True}
+    )
+    assert too_large["needsClarification"] is True
+    assert "requiresConfirmation" not in too_large
 
     subnet = await network.execute_net_subnet_calc(
         {"cidr": "192.0.2.0/24", "new_prefix": 26}

@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import time
 import uuid
 from collections.abc import AsyncIterator, Callable
 from typing import Any
@@ -19,6 +20,26 @@ _LOGGER = logging.getLogger(__name__)
 _TASKS: dict[str, asyncio.Task] = {}
 _LOCK = asyncio.Lock()
 _TERMINAL = frozenset({"completed", "failed", "interrupted"})
+
+
+def _has_live_pending_approval(connection, root_request_id: str) -> bool:
+    """Vérifie qu'un arrêt ``pending_confirmation`` possède une vraie action UI.
+
+    Le texte ou le ``stopReason`` émis par le modèle ne constitue jamais une
+    approbation. Seul un reçu persistant, non expiré et lié au tour racine peut
+    conserver l'exclusion mutuelle de la conversation.
+    """
+    table = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'tool_approval_requests'"
+    ).fetchone()
+    if table is None:
+        return False
+    return connection.execute(
+        """SELECT 1 FROM tool_approval_requests
+           WHERE request_id = ? AND status = 'pending' AND expires_at > ?
+           LIMIT 1""",
+        (str(root_request_id), time.time()),
+    ).fetchone() is not None
 
 
 def payload_hash(payload: dict[str, Any]) -> str:
@@ -58,6 +79,30 @@ def recover_orphaned_turns() -> int:
                 (message, request_id),
             )
             recovered += 1
+        slot_table = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'chat_turn_slots'"
+        ).fetchone()
+        if slot_table is not None:
+            slots = connection.execute(
+                "SELECT conversation_key, root_request_id FROM chat_turn_slots"
+            ).fetchall()
+            for slot in slots:
+                root_request_id = str(slot["root_request_id"])
+                turn = connection.execute(
+                    "SELECT status, owner_token FROM chat_turns WHERE request_id = ?",
+                    (root_request_id,),
+                ).fetchone()
+                owned_running = (
+                    turn is not None
+                    and str(turn["status"]) == "running"
+                    and str(turn["owner_token"]) == _PROCESS_TOKEN
+                )
+                if owned_running or _has_live_pending_approval(connection, root_request_id):
+                    continue
+                connection.execute(
+                    "DELETE FROM chat_turn_slots WHERE conversation_key = ? AND root_request_id = ?",
+                    (str(slot["conversation_key"]), root_request_id),
+                )
     return recovered
 
 
@@ -250,7 +295,11 @@ async def _produce(
             # journal. Le client peut ainsi les mémoriser avant de recevoir ``done``
             # et démarrer le nouveau tour sans course entre deux événements SSE.
             if event.get("type") == "done":
-                keep_slot_for_approval = event.get("stopReason") == "pending_confirmation"
+                if event.get("stopReason") == "pending_confirmation" and steering_root_request_id:
+                    with db() as connection:
+                        keep_slot_for_approval = _has_live_pending_approval(
+                            connection, steering_root_request_id
+                        )
                 if steering_root_request_id and not keep_slot_for_approval:
                     import chat_turn_steering
                     if chat_turn_steering.enabled():
@@ -365,12 +414,38 @@ async def _ensure_started(
             import chat_turn_steering
             if chat_turn_steering.enabled():
                 if not conversation_key:
-                    raise ValueError("Une clé de conversation UUID est requise pour ce tour.")
-                chat_turn_steering.reserve(
-                    conversation_key,
-                    steering_root,
-                    conversation_id or "",
-                )
+                    message = "Une clé de conversation UUID est requise pour ce tour."
+                    if created:
+                        _append_event(request_id, {"type": "error", "message": message})
+                        _finish(request_id, "failed", message)
+                        return "failed"
+                    raise ValueError(message)
+                try:
+                    chat_turn_steering.reserve(
+                        conversation_key,
+                        steering_root,
+                        conversation_id or "",
+                    )
+                except Exception as exc:
+                    from repositories.chat_turn_directives import ConversationBusyError
+
+                    if not isinstance(exc, ConversationBusyError) or not created:
+                        raise
+                    message = (
+                        "Cette conversation traite déjà une demande. "
+                        "Votre nouveau message n'a pas été lancé; utilisez le pilotage ou attendez la fin du tour."
+                    )
+                    _append_event(
+                        request_id,
+                        {
+                            "type": "error",
+                            "code": "conversation_busy",
+                            "message": message,
+                            "retryable": True,
+                        },
+                    )
+                    _finish(request_id, "failed", message)
+                    return "failed"
 
         if created:
             task = asyncio.create_task(_produce(

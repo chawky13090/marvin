@@ -3648,7 +3648,7 @@ TOOLS_SPEC = [
         "max_hops": {"type": "integer", "description": "Nombre maximum de sauts (défaut 15, max 30)"}},
        ["host"]),
 
-    _t("net_scan_local", "Scanne le réseau local via ARP pour détecter tous les appareils connectés.",
+    _t("net_scan_local", "Lit le cache ARP local pour inventorier les voisins récemment vus. Ce n'est pas un scan actif et il peut omettre des appareils silencieux.",
        {}, []),
 
     _t("net_whois", "Requête WHOIS sur un domaine ou une adresse IP pour obtenir les infos d'enregistrement.",
@@ -3661,7 +3661,7 @@ TOOLS_SPEC = [
         "profile":   {"type": "string",  "enum": ["quick", "web", "windows", "remote", "top100"], "description": "Profil de ports si 'ports' est vide"},
         "ports":     {"type": "string",  "description": "Ports CSV/plages, ex: 22,80,443 ou 1-1024"},
         "timeout":   {"type": "number",  "description": "Timeout TCP par port en secondes"},
-        "confirmed": {"type": "boolean", "description": "Confirmation pour scans larges CIDR/plages"}},
+        },
        ["target"]),
 
     _t("net_service_detect", "Détecte les services TCP ouverts sur un hôte et tente une capture de bannière simple (sans scan agressif).",

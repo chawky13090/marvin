@@ -184,6 +184,16 @@ def test_launcher_recovers_known_docker_socket_crash_without_data_reset() -> Non
     assert "docker-secrets-engine" in launcher
     assert "Runtime Docker preserve" in launcher
     assert "Start-Process $dockerDesktop -WindowStyle Hidden" in launcher
+    assert "$MaxSocketRecoveryAttempts = 3" in launcher
+    assert "Get-Content -LiteralPath $LogPath -Tail 500" in launcher
+    assert "UtcNow.AddMinutes(-30)" in launcher
+    assert "$script:LastRecoveredDockerCrashLine" in launcher
+    assert "function Test-DockerStartupBackoff" in launcher
+    assert "function Set-DockerStartupBackoff" in launcher
+    assert "function Clear-DockerStartupBackoff" in launcher
+    assert "docker-startup-backoff.json" in launcher
+    assert "StartupOrigin -eq 'marvin-background'" in launcher
+    assert "user_data_modified = $false" in launcher
     assert "Reset to factory defaults" not in launcher
     assert "docker volume rm" not in launcher
     assert "docker system prune" not in launcher

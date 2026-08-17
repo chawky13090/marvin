@@ -45,6 +45,7 @@ def _assert_static_contract() -> None:
     ollama_port_resolver = (ROOT / "scripts" / "resolve-ollama-port.ps1").read_text(encoding="utf-8")
     loopback_waiter = (ROOT / "scripts" / "wait-loopback-http.ps1").read_text(encoding="utf-8")
     searxng_starter = (ROOT / "docker" / "searxng" / "start-searxng.ps1").read_text(encoding="utf-8")
+    assert "-StartupOrigin marvin-background" in (ROOT / "start.bat").read_text(encoding="utf-8")
     uninstaller = (ROOT / "scripts" / "uninstall-marvin.ps1").read_text(encoding="utf-8")
     report = (ROOT / "scripts" / "write-install-report.ps1").read_text(encoding="utf-8")
     starter = (ROOT / "start.bat").read_text(encoding="utf-8")

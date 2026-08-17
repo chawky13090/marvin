@@ -156,7 +156,7 @@ where docker >nul 2>nul
 if %ERRORLEVEL% EQU 0 (
     echo [3/4] Recherche web auto-hebergee ^(SearXNG^) en arriere-plan...
     if not exist "%~dp0runtime\logs" mkdir "%~dp0runtime\logs" >nul 2>&1
-    start "" /B powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0docker\searxng\start-searxng.ps1" 1>"%~dp0runtime\logs\searxng-startup.log" 2>&1
+    start "" /B powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0docker\searxng\start-searxng.ps1" -StartupOrigin marvin-background 1>"%~dp0runtime\logs\searxng-startup.log" 2>&1
 ) else (
     echo [3/4] Docker non detecte - capacite SearXNG indisponible, socle Marvin maintenu.
 )

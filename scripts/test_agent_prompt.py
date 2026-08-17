@@ -38,6 +38,10 @@ def main() -> int:
         assert "CODE WORKSPACE ET TESTS" in prompt
         assert "Seuls les messages portant le rôle `user`" in prompt
         assert "DISTINGUE TOUJOURS deux intentions différentes pour le Web" in prompt
+        assert "un identifiant technique précis" in prompt.casefold()
+        assert "personne privée" in prompt
+        assert "mineur réel ou possible" in prompt
+        assert "Ne corrèle" in prompt or "Ne cherche pas à corréler" in prompt
         assert fake_home in prompt
         assert str(Path(fake_home) / "Desktop") in prompt
 

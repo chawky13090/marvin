@@ -6,6 +6,7 @@ import asyncio
 import json
 import sys
 import tempfile
+import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -19,6 +20,7 @@ import chat_turn_steering
 from db_connection import db
 from db_migrations import MIGRATIONS, apply_migrations
 from repositories.chat_turn_directives import ChatTurnDirectiveRepository
+from repositories.tool_approvals import ToolApprovalRepository
 
 
 def _event(chunk: str) -> dict:
@@ -228,6 +230,23 @@ async def _exercise(path: Path) -> None:
                            VALUES (?, ?, 'conv-steering', 'running', ?)""",
                         (request_id, f"hash-{request_id}", chat_turn_runtime._PROCESS_TOKEN),
                     )
+                connection.execute(
+                    """INSERT INTO tool_approval_requests (
+                           id, call_digest, tool_name, arguments_json,
+                           conversation_id, request_id, source, risk_tier,
+                           status, expires_at
+                       ) VALUES (?, ?, ?, '{}', ?, ?, ?, ?, 'pending', ?)""",
+                    (
+                        "approval-live",
+                        "digest-live",
+                        "file_delete",
+                        "conv-steering",
+                        "root-steering",
+                        "tool_gateway",
+                        4,
+                        time.time() + 300,
+                    ),
+                )
 
             async def approval_producer():
                 yield 'data: {"type":"done","stopReason":"pending_confirmation"}\n\n'
@@ -257,12 +276,74 @@ async def _exercise(path: Path) -> None:
             types = [json.loads(row[0])["type"] for row in rows]
             assert types == ["directive_ready", "done"]
 
+            # Un simple stopReason sans approbation persistée ne doit jamais
+            # immobiliser la conversation ni bloquer l'arrêt de Marvin.
+            chat_turn_steering.reserve("conv-no-approval", "root-no-approval", "conv-no-approval")
+            with db(path) as connection:
+                connection.execute(
+                    """INSERT INTO chat_turns
+                       (request_id, payload_hash, conversation_id, status, owner_token)
+                       VALUES ('part-no-approval', 'hash-no-approval',
+                               'conv-no-approval', 'running', ?)""",
+                    (chat_turn_runtime._PROCESS_TOKEN,),
+                )
+            await chat_turn_runtime._produce(
+                "part-no-approval",
+                approval_producer(),
+                steering_root_request_id="root-no-approval",
+                conversation_key="conv-no-approval",
+            )
+            assert chat_turn_steering.active("conv-no-approval") is None
+
+            # Une seconde demande concurrente devient un reçu terminal explicite,
+            # pas un tour fantôme ``running`` ni une seconde exécution métier.
+            chat_turn_steering.reserve("conv-busy", "root-busy", "conv-busy")
+            busy_started = False
+
+            async def busy_producer():
+                nonlocal busy_started
+                busy_started = True
+                yield 'data: {"type":"done"}\n\n'
+
+            busy_events = []
+            async for chunk in chat_turn_runtime.subscribe(
+                request_id="turn-busy",
+                fingerprint="hash-busy",
+                conversation_id="conv-busy",
+                conversation_key="conv-busy",
+                root_request_id="root-other",
+                producer_factory=busy_producer,
+            ):
+                busy_events.append(_event(chunk))
+            assert busy_started is False
+            assert busy_events[-1]["code"] == "conversation_busy"
+            with db(path) as connection:
+                assert connection.execute(
+                    "SELECT status FROM chat_turns WHERE request_id = 'turn-busy'"
+                ).fetchone()[0] == "failed"
+
+            # Le démarrage nettoie aussi un ancien slot sans approbation vivante.
+            with db(path) as connection:
+                connection.execute(
+                    """INSERT INTO chat_turns
+                       (request_id, payload_hash, conversation_id, status, owner_token)
+                       VALUES ('root-stale', 'hash-stale', 'conv-stale', 'completed', 'old')"""
+                )
+                connection.execute(
+                    """INSERT INTO chat_turn_slots
+                       (conversation_key, root_request_id, conversation_id)
+                       VALUES ('conv-stale', 'root-stale', 'conv-stale')"""
+                )
+            assert chat_turn_runtime.recover_orphaned_turns() == 0
+            assert chat_turn_steering.active("conv-stale") is None
+
 
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="marvin-chat-turn-") as directory:
         path = Path(directory) / "turns.db"
         with db(path) as connection:
             apply_migrations(connection, MIGRATIONS)
+            ToolApprovalRepository.ensure_schema(connection)
         # Les scénarios historiques du journal durable ne fournissent pas de clé
         # de conversation. Ils caractérisent ce composant seul; le scénario de
         # pilotage réactive explicitement la fonctionnalité dans son propre bloc.

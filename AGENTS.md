@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.680.0, 364 outils, 396 routes.** Architecture dans
+> **État courant : v2.681.0, 364 outils, 396 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,24 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.680.0)
+## 9. État actuel (v2.681.0)
+
+**v2.681 (chat réparable et diagnostics honnêtes)** : un second tour refusé par le verrou de
+conversation est maintenant terminalisé sans lancer le producteur; il ne peut plus rester
+`running` et bloquer l'arrêt. Une attente d'approbation ne conserve le slot que si une demande
+persistée, liée à la racine et non expirée existe; le démarrage nettoie aussi les anciens slots
+orphelins sans rejouer d'action. L'inventaire local est explicitement un cache ARP passif et
+écarte multicast et diffusion. Les scans trop larges échouent fermé par seuil calculable, sans
+`confirmed` fourni par le modèle. Enfin, les corrections courtes de référence conservent la
+mission active et les recherches sur personnes privées ou mineurs minimisent strictement les
+données. Gate rapide : 359 exécutées, 6 live/build ignorées, zéro échec. Rollback : réversion
+atomique de v2.681; aucune migration ou réécriture de conversation. Docker Desktop 4.86.0
+a aussi exposé deux sockets AF_UNIX optionnelles mortes successives. Le bootstrap recherche
+désormais la cause récente malgré les répétitions du dialogue, ne traite chaque crash qu'une
+fois, autorise au plus trois récupérations réversibles et ouvre ensuite un coupe-circuit de
+24 heures pour les démarrages Marvin. Le socle continue alors sans SearXNG. Validation réelle :
+Docker Engine 29.7.2 rétabli, conteneur `marvin-searxng` actif sur le port loopback 8391 et
+80 moteurs chargés, sans réinitialisation ni suppression de données Docker.
 
 **v2.680 (composeur responsive et pilotage lisible)** : l’accueil conserve le grand avatar
 Marvin et exploite une colonne élargie; après le premier message, la saisie reste ancrée en bas

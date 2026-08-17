@@ -247,13 +247,14 @@ async def execute_net_traceroute(args: dict) -> dict:
 
 
 async def execute_net_scan_local(args: dict) -> dict:
-    """Scanne le réseau local pour détecter les appareils connectés (ARP scan via arp -a)."""
+    """Lit le cache ARP local et en extrait uniquement les voisins plausibles."""
     try:
         result = await asyncio.to_thread(subprocess.run, ["arp", "-a"], capture_output=True, timeout=15)
         output = result.stdout.decode(_console_output_encoding(), errors="replace")
 
         # Parse ARP table
         devices = []
+        excluded_entries = 0
         for line in output.splitlines():
             # Windows: "  192.168.1.1   aa-bb-cc-dd-ee-ff   dynamic"
             parts = line.split()
@@ -262,16 +263,32 @@ async def execute_net_scan_local(args: dict) -> dict:
                 mac = parts[1].strip() if len(parts) > 1 else ""
                 type_ = parts[2].strip() if len(parts) > 2 else ""
                 try:
-                    _ipaddress.ip_address(ip)
-                    if not ip.startswith("224.") and not ip.startswith("239.") and ip != "255.255.255.255":
-                        devices.append({"ip": ip, "mac": mac, "type": type_})
+                    address = _ipaddress.ip_address(ip)
+                    normalized_mac = mac.replace(":", "-").casefold()
+                    is_broadcast_mac = normalized_mac == "ff-ff-ff-ff-ff-ff"
+                    if (
+                        address.is_multicast
+                        or address.is_unspecified
+                        or str(address) == "255.255.255.255"
+                        or is_broadcast_mac
+                    ):
+                        excluded_entries += 1
+                        continue
+                    devices.append({"ip": ip, "mac": mac, "type": type_})
                 except ValueError:
                     pass
 
         return {
+            "success": True,
             "devices": devices,
             "count": len(devices),
-            "raw": output.strip(),
+            "source": "arp_cache",
+            "discovery_mode": "passive_cache",
+            "excluded_entries": excluded_entries,
+            "coverage_caveat": (
+                "Le cache ARP n'est pas un scan actif : il peut omettre des appareils "
+                "qui n'ont pas communiqué récemment avec ce PC."
+            ),
         }
     except Exception as e:
         return {"error": str(e)}
@@ -353,9 +370,8 @@ def _net_parse_ports(ports_raw: Any, *, limit: int = 256) -> list[int]:
     return sorted(set(ports))[:limit]
 
 
-def _net_targets(target: str, *, confirmed: bool, max_hosts: int = 64) -> tuple[list[str], dict | None]:
-    """Résout une cible (IP unique OU CIDR) en liste d'hôtes. Un CIDR trop large sans
-    confirmation renvoie une demande de confirmation plutôt que de scanner en silence."""
+def _net_targets(target: str, *, max_hosts: int = 64) -> tuple[list[str], dict | None]:
+    """Résout une cible bornée sans accepter de pseudo-confirmation du modèle."""
     target = str(target or "").strip()
     if not target:
         return [], {"error": "Paramètre 'target' requis."}
@@ -365,18 +381,23 @@ def _net_targets(target: str, *, confirmed: bool, max_hosts: int = 64) -> tuple[
         net = _ipaddress.ip_network(target, strict=False)
     except Exception as e:
         return [], {"error": f"CIDR invalide : {e}"}
-    hard_limit = max_hosts if confirmed else min(max_hosts, 64)
-    if net.num_addresses > hard_limit and not confirmed:
+    host_count = int(net.num_addresses) if net.num_addresses <= 2 else int(net.num_addresses - 2)
+    if host_count > max_hosts:
         return [], {
-            "requiresConfirmation": True,
-            "message": f"Scan large bloqué : {target} contient {net.num_addresses} adresses. "
-                      f"Relance avec confirmed=true si c'est voulu.",
-            "suggested_args": {"target": target, "confirmed": True},
+            "success": False,
+            "needsClarification": True,
+            "scopeRejected": True,
+            "message": (
+                f"Périmètre trop large : {target} contient {host_count} hôtes utilisables. "
+                f"Choisissez au maximum {max_hosts} hôtes ou utilisez d'abord l'inventaire ARP."
+            ),
+            "target_count": host_count,
+            "max_hosts": max_hosts,
         }
     hosts = [str(ip) for ip in net.hosts()]
     if not hosts and net.num_addresses == 1:
         hosts = [str(net.network_address)]
-    return hosts[:hard_limit], None
+    return hosts, None
 
 
 async def _net_tcp_probe(host: str, port: int, timeout: float = 0.8) -> dict:
@@ -427,9 +448,8 @@ async def execute_net_nmap_scan(args: dict) -> dict:
     sondage TCP asynchrone interne (aucune installation requise dans les deux cas)."""
     target = (args.get("target") or args.get("host") or "").strip()
     profile = str(args.get("profile") or "quick").lower()
-    confirmed = bool(args.get("confirmed", False))
     timeout = max(0.2, min(float(args.get("timeout", 0.8)), 5.0))
-    port_limit = 1024 if confirmed else 256
+    port_limit = 256
     ports_raw = args.get("ports") or _NET_PROFILE_PORTS.get(profile, _NET_PROFILE_PORTS["quick"])
     try:
         ports = _net_parse_ports(ports_raw, limit=port_limit)
@@ -437,15 +457,19 @@ async def execute_net_nmap_scan(args: dict) -> dict:
         return {"error": f"Ports invalides : {e}"}
     if not ports:
         return {"error": "Aucun port valide à scanner."}
-    targets, blocked = _net_targets(target, confirmed=confirmed, max_hosts=256 if confirmed else 64)
+    targets, blocked = _net_targets(target, max_hosts=64)
     if blocked:
         return blocked
-    if len(targets) * len(ports) > (12000 if confirmed else 1200):
+    if len(targets) * len(ports) > 1200:
         return {
-            "requiresConfirmation": True,
-            "message": "Scan trop large pour une exécution directe. Réduis ports/cible ou relance avec confirmed=true.",
+            "success": False,
+            "needsClarification": True,
+            "scopeRejected": True,
+            "message": "Scan trop large pour une exécution directe. Réduisez les ports ou la cible.",
             "target_count": len(targets),
             "port_count": len(ports),
+            "probe_count": len(targets) * len(ports),
+            "max_probes": 1200,
         }
 
     nmap_path = shutil.which("nmap")

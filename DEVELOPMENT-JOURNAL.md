@@ -5,6 +5,56 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-17 — v2.681.0 — arrêt du chat débloqué et défauts des dernières conversations corrigés
+
+- Demande : expliquer pourquoi Marvin ne pouvait plus s'arrêter, inspecter les dernières
+  conversations et corriger les défauts de chat et de réponse observés.
+- Cause racine confirmée : trois demandes concurrentes avaient créé des lignes `running` avant
+  d'échouer sur le verrou de conversation. Le tour précédent avait en outre conservé son slot
+  sur un simple `stopReason=pending_confirmation`, sans approbation persistée et cliquable. Le
+  contrôle d'activité comptait ces quatre états périmés et refusait donc l'arrêt normal.
+- Correction chat : un refus de concurrence devient désormais un événement terminal typé
+  `conversation_busy`, sans lancer le producteur. Un slot n'est conservé que par une approbation
+  persistée, non expirée et liée au tour racine. Au démarrage, les producteurs orphelins sont
+  interrompus sans rejeu et les slots sans tour actif ni approbation vivante sont supprimés.
+- Correction réseau : `net_scan_local` annonce qu'il lit un cache ARP passif, retire les entrées
+  multicast et de diffusion et ne publie plus la sortie brute. `net_nmap_scan` n'accepte plus un
+  booléen `confirmed` fabriquable par le modèle : un périmètre supérieur à 64 hôtes ou 1 200
+  sondes échoue fermé avec une demande de réduction calculable, jamais une fausse carte de
+  confirmation.
+- Qualité et confidentialité : le prompt conserve désormais l'objectif actif lors d'une courte
+  correction de référence, fait primer marque, modèle et catégorie sur un homonyme générique,
+  et exige une vérification séparée des variantes et images. Les recherches sur une personne
+  privée, surtout un mineur réel ou possible, ne peuvent plus agréger école, localisation,
+  pseudonyme social, proches ou relations avec une autre personne privée.
+- Sécurité et données : aucune conversation ni aucun reçu n'est supprimé ou réécrit. La reprise
+  ne rejoue jamais une action. Les nouvelles règles réduisent l'exposition de données de tiers;
+  le cache ARP brut ne sort plus du domaine réseau. Aucun secret ou texte utilisateur n'est
+  ajouté aux logs.
+- Incident Docker distinct : Docker Desktop 4.86.0 échouait successivement sur les sockets
+  optionnelles `dockerInference` puis `docker-secrets-engine/engine.sock`. La première
+  récupération ne voyait plus la ligne causale, repoussée par les répétitions du dialogue.
+  Le bootstrap inspecte maintenant jusqu'à 500 lignes, exige un crash daté de moins de
+  30 minutes et refuse de retraiter la même ligne. Il effectue au plus trois récupérations,
+  puis inscrit un coupe-circuit local de 24 heures pour les lancements Marvin afin de ne plus
+  rouvrir la fenêtre d'erreur. Le mode manuel reste disponible pour un diagnostic volontaire.
+  Les répertoires runtime défectueux et la configuration sont conservés par renommage/copie;
+  aucun volume, conteneur, image ou donnée utilisateur Docker n'est supprimé.
+- Validation observée : tests ciblés du prompt, du domaine réseau et du runtime de chat réussis;
+  le gate rapide complet passe avec 359 étapes exécutées, 6 étapes live/build explicitement
+  ignorées et 0 échec. Un redémarrage live a ensuite confirmé zéro tour actif et zéro slot,
+  puis `stop.bat` a terminé proprement Marvin en 15,978 s sans forçage. Les contrats SearXNG et
+  installateur passent. La récupération réelle a rétabli Docker Engine 29.7.2 et SearXNG sur
+  `http://localhost:8391` avec 80 moteurs; le marqueur de coupe-circuit a été effacé après succès.
+  Après synchronisation de `CLAUDE.md`, le gate rapide final repasse à 359/359 avec 6 skips
+  déclarés. Le redémarrage final expose backend 2.681.0 et frontend en HTTP 200; le smoke live
+  du pilotage reçoit puis applique/reprend une directive sans outil métier et termine proprement.
+- Rollback : réversion atomique du commit v2.681; aucun schéma ni format persistant ne change.
+  Après rollback, un redémarrage suffit; aucun tour terminal ne doit être remis en `running`.
+  Pour annuler la seule récupération Docker, arrêter Docker Desktop puis restaurer la sauvegarde
+  `settings-store.json.pre-marvin-socket-recovery-*` et, si nécessaire, les répertoires
+  `.stale-*` correspondants; ne jamais les fusionner pendant que Docker tourne.
+
 ## 2026-08-16 — v2.680.0 — composeur responsive et robot de travail préservé
 
 - Demande : conserver la sidebar des conversations, agrandir la zone d’écriture, placer le

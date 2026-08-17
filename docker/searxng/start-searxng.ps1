@@ -11,6 +11,10 @@ param(
     [int]$DockerProbeTimeoutSeconds = 5,
     [ValidateRange(30, 600)]
     [int]$DockerStartupTimeoutSeconds = 180,
+    [ValidateSet('manual', 'marvin-background')]
+    [string]$StartupOrigin = 'manual',
+    [ValidateRange(1, 168)]
+    [int]$StartupBackoffHours = 24,
     [switch]$LockSelfTest,
     [ValidateRange(0, 10000)]
     [int]$LockSelfTestHoldMilliseconds = 0
@@ -20,8 +24,43 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $backendUrl = "http://127.0.0.1:8005"
+$stateRoot = [System.IO.Path]::GetFullPath((Join-Path $here '..\..\runtime\searxng'))
+$dockerBackoffPath = Join-Path $stateRoot 'docker-startup-backoff.json'
 
 function Write-Step($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
+
+function Test-DockerStartupBackoff {
+    if (-not (Test-Path -LiteralPath $dockerBackoffPath -PathType Leaf)) {
+        return $false
+    }
+    try {
+        $State = Get-Content -LiteralPath $dockerBackoffPath -Raw -ErrorAction Stop | ConvertFrom-Json
+        $RecordedAt = [DateTimeOffset]::Parse([string]$State.recorded_at_utc)
+        return $RecordedAt.AddHours($StartupBackoffHours) -gt [DateTimeOffset]::UtcNow
+    } catch {
+        # Un état illisible ne doit jamais bloquer Docker indéfiniment.
+        Remove-Item -LiteralPath $dockerBackoffPath -Force -ErrorAction SilentlyContinue
+        return $false
+    }
+}
+
+function Set-DockerStartupBackoff([string]$Reason) {
+    [System.IO.Directory]::CreateDirectory($stateRoot) | Out-Null
+    $Payload = [ordered]@{
+        schema_version = 1
+        recorded_at_utc = [DateTimeOffset]::UtcNow.ToString('o')
+        reason = $Reason
+        automatic_retry_after_hours = $StartupBackoffHours
+        user_data_modified = $false
+    } | ConvertTo-Json -Depth 4
+    $Temporary = $dockerBackoffPath + '.new'
+    [System.IO.File]::WriteAllText($Temporary, $Payload, [System.Text.UTF8Encoding]::new($false))
+    Move-Item -LiteralPath $Temporary -Destination $dockerBackoffPath -Force
+}
+
+function Clear-DockerStartupBackoff {
+    Remove-Item -LiteralPath $dockerBackoffPath -Force -ErrorAction SilentlyContinue
+}
 
 function Test-DockerDaemon([string]$DockerPath, [int]$TimeoutSeconds) {
     $Stdout = [System.IO.Path]::GetTempFileName()
@@ -55,18 +94,38 @@ function Test-DockerDaemon([string]$DockerPath, [int]$TimeoutSeconds) {
     }
 }
 
+$script:DetectedDockerCrashLine = $null
+$script:LastRecoveredDockerCrashLine = $null
+
 function Test-DockerStaleSocketCrash {
     $LogPath = Join-Path $env:LOCALAPPDATA 'Docker\log\host\com.docker.backend.exe.log'
     if (-not (Test-Path -LiteralPath $LogPath -PathType Leaf)) {
         return $false
     }
     try {
-        # La signature doit rester dans la queue immédiate du journal afin
-        # qu'un ancien incident ne déclenche pas une réparation lors d'un
-        # simple démarrage volontaire. Elle est indépendante de la langue OS.
-        $RecentLines = @(Get-Content -LiteralPath $LogPath -Tail 30 -ErrorAction Stop)
+        # Docker répète ensuite le dialogue d'erreur et peut repousser la ligne
+        # causale loin de la queue immédiate. On recherche donc plus largement,
+        # mais on exige un horodatage récent et on ne répare jamais deux fois
+        # le même crash. La signature reste indépendante de la langue OS.
+        $RecentLines = @(Get-Content -LiteralPath $LogPath -Tail 500 -ErrorAction Stop)
         $Signature = 'backend crashed, dumping error.*initializing (Inference manager|Secrets Engine):.*(dockerInference|engine\.sock): remove .*\(listener:'
-        return [bool]($RecentLines -match $Signature)
+        $CrashLine = @($RecentLines | Where-Object { $_ -match $Signature } | Select-Object -Last 1)
+        if ($CrashLine.Count -ne 1 -or $CrashLine[0] -eq $script:LastRecoveredDockerCrashLine) {
+            return $false
+        }
+        $TimestampMatch = [regex]::Match([string]$CrashLine[0], '^\[(?<timestamp>[^\]]+)\]')
+        if (-not $TimestampMatch.Success) {
+            return $false
+        }
+        $CrashAt = [DateTimeOffset]::MinValue
+        if (-not [DateTimeOffset]::TryParse($TimestampMatch.Groups['timestamp'].Value, [ref]$CrashAt)) {
+            return $false
+        }
+        if ($CrashAt -lt [DateTimeOffset]::UtcNow.AddMinutes(-30)) {
+            return $false
+        }
+        $script:DetectedDockerCrashLine = [string]$CrashLine[0]
+        return $true
     } catch {
         return $false
     }
@@ -98,6 +157,7 @@ function Repair-DockerStaleSocketCrash {
     if (-not (Test-DockerStaleSocketCrash)) {
         return $false
     }
+    $script:LastRecoveredDockerCrashLine = $script:DetectedDockerCrashLine
     Write-Step 'Crash Docker AF_UNIX detecte -- recuperation reversible des runtimes optionnels...'
     Get-Process -ErrorAction SilentlyContinue | Where-Object {
         $_.ProcessName -in @('Docker Desktop', 'com.docker.backend', 'docker', 'dockerd')
@@ -167,6 +227,10 @@ Write-Step "Verification du demon Docker..."
 $dockerReady = Test-DockerDaemon -DockerPath $DockerPath -TimeoutSeconds $DockerProbeTimeoutSeconds
 
 if (-not $dockerReady) {
+    if ($StartupOrigin -eq 'marvin-background' -and (Test-DockerStartupBackoff)) {
+        Write-Host "Docker reste indisponible après un échec récent. Démarrage automatique différé; Marvin continue sans SearXNG." -ForegroundColor Yellow
+        exit 2
+    }
     Write-Step "Demon Docker arrete -- demarrage de Docker Desktop..."
     $dockerDesktop = "C:\Program Files\Docker\Docker\Docker Desktop.exe"
     if (Test-Path $dockerDesktop) {
@@ -176,11 +240,15 @@ if (-not $dockerReady) {
         exit 1
     }
     $DockerDeadline = [DateTimeOffset]::UtcNow.AddSeconds($DockerStartupTimeoutSeconds)
-    $SocketRecoveryAttempted = $false
+    $SocketRecoveryAttempts = 0
+    $MaxSocketRecoveryAttempts = 3
     while (-not $dockerReady -and [DateTimeOffset]::UtcNow -lt $DockerDeadline) {
         Start-Sleep -Seconds 3
-        if (-not $SocketRecoveryAttempted -and (Test-DockerStaleSocketCrash)) {
-            $SocketRecoveryAttempted = $true
+        if (
+            $SocketRecoveryAttempts -lt $MaxSocketRecoveryAttempts -and
+            (Test-DockerStaleSocketCrash)
+        ) {
+            $SocketRecoveryAttempts += 1
             if (Repair-DockerStaleSocketCrash) {
                 Start-Process $dockerDesktop -WindowStyle Hidden
             }
@@ -190,10 +258,12 @@ if (-not $dockerReady) {
         $dockerReady = Test-DockerDaemon -DockerPath $DockerPath -TimeoutSeconds $ProbeSeconds
     }
     if (-not $dockerReady) {
+        Set-DockerStartupBackoff -Reason 'docker_daemon_startup_failed'
         Write-Host "Docker Desktop n'a pas demarre dans la borne de $DockerStartupTimeoutSeconds secondes. Reessaie une fois qu'il est pret." -ForegroundColor Red
         exit 1
     }
 }
+Clear-DockerStartupBackoff
 Write-Host "Demon Docker pret." -ForegroundColor Green
 
 # -- 2b. Port loopback libre et non exclu par Hyper-V/WSL --------------------
