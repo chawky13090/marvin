@@ -61,8 +61,8 @@
 }
 
 .bubbleAssistant {
-  background: rgba(255, 255, 255, 0.018);
-  border: 1px solid rgba(255, 255, 255, 0.055);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
   color: var(--text-primary);
   border-bottom-left-radius: var(--radius-sm);
 }
@@ -86,7 +86,7 @@
 }
 
 .content code {
-  background: hsla(230, 25%, 10%, 0.5);
+  background: var(--code-background);
   padding: 2px 6px;
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
@@ -98,7 +98,7 @@
 }
 
 .content pre {
-  background: hsla(230, 25%, 8%, 0.8);
+  background: var(--code-background-strong);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-md);
@@ -299,7 +299,7 @@
   border-collapse: collapse;
   margin: var(--space-md) 0;
   font-size: 0.9em;
-  background: hsla(230, 25%, 10%, 0.3);
+  background: var(--surface-subtle);
   border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid var(--border);
@@ -313,7 +313,7 @@
 }
 
 .content th {
-  background: hsla(230, 25%, 12%, 0.6);
+  background: var(--surface-hover);
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -323,5 +323,5 @@
 }
 
 .content tr:hover td {
-  background: hsla(230, 25%, 22%, 0.25);
+  background: var(--surface-active);
 }

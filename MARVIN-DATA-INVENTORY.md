@@ -21,6 +21,11 @@ Les directives de pilotage sont conservées dans SQLite (`chat_turn_directives`)
 conversation : exportées en mode audit, incluses dans la sauvegarde chiffrée de la base et
 effacées avec leur conversation. Leur texte est interdit dans les journaux techniques.
 
+Les clés publiques SSH apprises au premier contact sont épinglées dans
+`data/ssh_known_hosts`. Ce registre TOFU est inclus dans la sauvegarde chiffrée; un changement
+de clé connu est refusé. Pour une cible sensible, l'empreinte du premier contact doit être
+vérifiée par un canal distinct. Supprimer une entrée réautorise uniquement ce premier contact.
+
 Le manifeste exécutable vit dans `backend/full_backup.py`. Tout nouveau fichier ou dossier
 de premier niveau sous `data/` doit être ajouté explicitement à une classe; sinon la création
 du bundle échoue. Les fichiers `.lock`, `.tmp` et `.partial` ne sont jamais archivés.

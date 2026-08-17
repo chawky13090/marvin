@@ -133,6 +133,32 @@ def main() -> int:
     assert projected_pdf["truncated"] is False
     assert "items" not in projected
 
+    software = {
+        "success": True,
+        "count": 227,
+        "apps": [{"name": f"Application {index}"} for index in range(227)],
+        "inventory_scope": "winget_win32_arp_msix",
+    }
+    projected_software = json.loads(compact_tool_result(
+        software, tool_name="winget_list_installed"
+    ))
+    assert projected_software["count"] == 227
+    assert projected_software["full_result_available_in_ui"] is True
+    assert projected_software["omitted_from_model_context"] == 215
+    assert len(projected_software["preview"]) == 12
+    assert "Ne relance pas" in projected_software["instruction"]
+
+    wrapped_software = {
+        "success": True,
+        "action": "software.list",
+        "result": software,
+    }
+    projected_wrapped = json.loads(compact_tool_result(
+        wrapped_software, tool_name="windows_task"
+    ))
+    assert projected_wrapped["count"] == 227
+    assert projected_wrapped["full_result_available_in_ui"] is True
+
     file_page = {
         "success": True,
         "currentDir": r"C:\Users\Chawb\Documents",

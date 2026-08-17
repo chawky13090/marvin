@@ -78,6 +78,27 @@ class SSHConnectionRepository:
             result.update(secrets)
         return result
 
+    def find_connection(
+        self, host: str, username: str = "", port: int = 22
+    ) -> dict[str, Any] | None:
+        """Résout une cible chat vers une connexion déjà protégée par le coffre DPAPI."""
+        normalized_host = str(host or "").strip().casefold()
+        normalized_user = str(username or "").strip().casefold()
+        if not normalized_host:
+            return None
+        matches = [
+            item for item in self.list_connections()
+            if str(item.get("host") or "").strip().casefold() == normalized_host
+            and int(item.get("port") or 22) == int(port or 22)
+            and (
+                not normalized_user
+                or str(item.get("username") or "").strip().casefold() == normalized_user
+            )
+        ]
+        if len(matches) != 1:
+            return None
+        return self.get_connection(str(matches[0]["id"]))
+
     def save_connection(
         self,
         name: str,
@@ -310,6 +331,7 @@ class SSHConnectionRepository:
 repository = SSHConnectionRepository()
 list_ssh_connections = repository.list_connections
 get_ssh_connection = repository.get_connection
+find_ssh_connection = repository.find_connection
 save_ssh_connection = repository.save_connection
 update_ssh_connection = repository.update_connection
 set_ssh_test_result = repository.set_test_result

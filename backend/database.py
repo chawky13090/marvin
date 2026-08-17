@@ -164,6 +164,7 @@ from repositories.screenshots import create_screenshot, list_screenshots
 from repositories.ssh_connections import (
     delete_ssh_connection,
     get_ssh_connection,
+    find_ssh_connection,
     list_ssh_connections,
     save_ssh_connection,
     set_ssh_test_result,

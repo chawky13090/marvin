@@ -5,6 +5,53 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-17 — v2.682.0 — audit des conversations, réseau complet, SSH sûr et cinq thèmes
+
+- Demande : corriger les défauts observés dans les dernières conversations (inventaire réseau,
+  applications installées, contrôle SSH), auditer les erreurs UI et ajouter les thèmes Sombre,
+  Clair, Manga, Médiéval et Cyberpunk sans réduire le chat ni le robot Marvin.
+- Causes confirmées : `net_subnet_sweep` appelait une signature périmée et sa concurrence était
+  bornée par hôte au lieu de l'être globalement. L'inventaire Winget retournait bien 227 entrées,
+  mais la projection agent et le rendu limité à 25 poussaient le modèle à relancer l'outil puis
+  à annoncer une liste inaccessible. Les commandes SSH acceptaient encore des secrets dans le
+  schéma public et Paramiko utilisait `AutoAddPolicy`; un timeout avait été interprété à tort
+  comme la preuve d'un blocage pare-feu.
+- Réseau : un `/24` privé est traité en un appel avec plafond de 4 096 sondes et sémaphore global.
+  Après les sondes TCP, les voisins ARP du même CIDR sont agrégés avec des signaux distincts;
+  un voisin sans port ouvert reste visible, sans transformer ARP en preuve de service.
+- Logiciels : le reçu Winget complet reste autoritatif et paginable par lots de 25 dans l'UI.
+  Le contexte du modèle reçoit seulement un aperçu borné, le total, le périmètre et l'instruction
+  de ne pas relancer ni déclarer les entrées omises perdues.
+- SSH et sécurité : le chat n'accepte plus mot de passe, clé privée ou passphrase. Il résout une
+  connexion enregistrée dans le coffre DPAPI, avec lien direct vers `/ssh` lorsqu'elle manque.
+  La première clé d'hôte est épinglée atomiquement dans `data/ssh_known_hosts`; tout changement
+  ultérieur est refusé. La limite TOFU de la première connexion est documentée, le registre est
+  inventorié comme donnée réseau personnelle et inclus dans la sauvegarde chiffrée. Les erreurs
+  et confirmations masquent les clés sensibles; un timeout SSH reste explicitement indéterminé.
+- Interface : le sombre historique reste le défaut SSR. Les quatre thèmes optionnels changent
+  uniquement des tokens visuels partagés, se sélectionnent sans rechargement, sont mémorisés
+  dans `localStorage` et reviennent au sombre sur valeur invalide. Le contrôle accessible est
+  placé dans l'en-tête et devient une icône sur mobile. Aucune route, autorisation, disposition,
+  animation ou fonction du robot n'est remplacée.
+- Logs : les fichiers runtime à la racine dataient de juillet et n'ont pas été pris pour des
+  incidents actuels. Le journal de bugs du 17 août s'arrête sur les défauts de concurrence et
+  confirmation déjà fermés en v2.681; la console navigateur active ne présente aucune erreur ni
+  alerte. Aucun secret, contenu de conversation ou inventaire détaillé n'est ajouté aux logs.
+- Validation observée : tests réseau, SSH, transport, repository, prompt, projection, sauvegarde,
+  inventaire de confidentialité et thèmes réussis; lint ciblé sans erreur; build de production
+  Next.js 16.2.12 réussi. Le gate rapide a exécuté 360 contrôles, ignoré explicitement les six
+  contrôles live/build et produit zéro échec sur 366 étapes attendues. Après redémarrage réel,
+  les 28 contrats API et les 41 pages passent. Le premier smoke chat, lancé immédiatement après
+  le parcours simultané des 41 pages, a observé trois 503 transitoires; rejoué seul sur les cinq
+  conversations de référence, il passe sans erreur console ni réponse HTTP en échec. Le test
+  réel du réseau `192.168.1.0/24` a couvert 254 adresses et
+  1 778 sondes en moins de huit secondes, puis identifié 11 voisins/hôtes au lieu des deux seuls
+  systèmes avec plusieurs ports ouverts. Winget a retourné 227 applications.
+- Rollback : réverter atomiquement le commit v2.682 puis redémarrer Marvin. Aucun schéma ni
+  contenu existant n'est migré. Supprimer `localStorage.marvin_theme` restaure le sombre. Ne
+  retirer `data/ssh_known_hosts` qu'après décision explicite : le conserver après rollback est
+  sans effet, le supprimer réinitialise volontairement la confiance SSH au premier usage.
+
 ## 2026-08-17 — v2.681.0 — arrêt du chat débloqué et défauts des dernières conversations corrigés
 
 - Demande : expliquer pourquoi Marvin ne pouvait plus s'arrêter, inspecter les dernières

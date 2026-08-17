@@ -25,7 +25,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 365
+EXPECTED_STAGE_COUNT = 366
 
 
 @dataclass(frozen=True)
@@ -796,6 +796,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Coherence des dependances Python", (python, "-m", "pip", "check")),
         Stage("Compilation du backend Python", action="compile_backend"),
         Stage("Baseline et qualite du frontend", (npm, "run", "check:frontend-baseline")),
+        Stage("Themes visuels du frontend", ("node", "scripts/test_frontend_themes.mjs")),
         Stage("Resilience du smoke HTTP", (python, "scripts/test_smoke_api_resilience.py")),
     ]
     build_skip = None

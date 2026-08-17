@@ -32,8 +32,10 @@ export const viewport = {
 };
 
 export default function RootLayout({ children }) {
+  const themeBootstrap = `(function(){try{var allowed=['dark','light','manga','medieval','cyberpunk'];var colors={dark:'#0a0a0d',light:'#f4f6fb',manga:'#fff8fc',medieval:'#17130d',cyberpunk:'#070713'};var value=localStorage.getItem('marvin_theme');var theme=allowed.indexOf(value)>=0?value:'dark';document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=(theme==='dark'||theme==='cyberpunk'||theme==='medieval')?'dark':'light';var meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.setAttribute('content',colors[theme]);}catch(e){document.documentElement.dataset.theme='dark';}})();`;
   return (
-    <html lang="fr" className={inter.variable}>
+    <html lang="fr" className={inter.variable} data-theme="dark" data-scroll-behavior="smooth" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: themeBootstrap }} /></head>
       <body>
         <LanAccessGate>
         {/* ChatProvider lives at the layout level → chat state survives page navigation.

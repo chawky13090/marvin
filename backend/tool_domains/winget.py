@@ -145,7 +145,17 @@ async def execute_winget_list_installed(args: dict) -> dict:
     apps = _parse_winget_table(r.get("stdout", ""))
     # On ne garde que les entrées avec un vrai ID winget (désinstallables proprement).
     apps = [a for a in apps if a.get("id") and a["id"].lower() not in ("id",)]
-    return {"success": True, "count": len(apps), "apps": apps}
+    return {
+        "success": True,
+        "count": len(apps),
+        "apps": apps,
+        "inventory_scope": "winget_win32_arp_msix",
+        "full_result_available_in_ui": True,
+        "coverage_caveat": (
+            "Les applications portables non enregistrées et sans paquet connu peuvent "
+            "ne pas apparaître dans l'inventaire Windows Package Manager."
+        ),
+    }
 
 
 async def _installed_exact(package_id: str) -> dict | None:

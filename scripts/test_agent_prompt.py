@@ -41,6 +41,9 @@ def main() -> int:
         assert "un identifiant technique précis" in prompt.casefold()
         assert "personne privée" in prompt
         assert "mineur réel ou possible" in prompt
+        assert "répète" in prompt.casefold() and "mot de passe" in prompt.casefold()
+        assert "connection_id" in prompt
+        assert "timeout réseau" in prompt.casefold()
         assert "Ne corrèle" in prompt or "Ne cherche pas à corréler" in prompt
         assert fake_home in prompt
         assert str(Path(fake_home) / "Desktop") in prompt

@@ -764,7 +764,7 @@ export default function ChatPage() {
         display: 'flex',
         flexShrink: 0,
       }}>
-      <div style={{ width: 'var(--conversation-pane)', minWidth: 'var(--conversation-pane)', display: 'flex', flexDirection: 'column', background: '#0d0d0d', height: '100%' }}>
+      <div style={{ width: 'var(--conversation-pane)', minWidth: 'var(--conversation-pane)', display: 'flex', flexDirection: 'column', background: 'var(--sidebar-background)', height: '100%' }}>
         <div style={{ padding: '16px' }}>
           <button
             onClick={() => {

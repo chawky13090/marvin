@@ -53,29 +53,41 @@ def resolve_target(args: dict[str, Any]) -> tuple[dict[str, Any] | None, str | N
 
     host = str(args.get("host") or "").strip()
     username = str(args.get("username") or "").strip()
-    if not host or not username:
+    if not host:
         return None, (
-            "Fournis soit 'connection_id' (connexion sauvegardée, voir ssh_list), "
-            "soit 'host' + 'username' (+ 'password' ou 'private_key') pour une connexion ponctuelle."
+            "Fournis 'connection_id' (voir ssh_list) ou l'hôte d'une connexion déjà "
+            "enregistrée dans l'onglet SSH."
         )
-    password = str(args.get("password") or "")
-    private_key = str(args.get("private_key") or "")
-    if not password.strip() and not private_key.strip():
-        return None, "Fournis 'password' ou 'private_key' pour te connecter à cette machine."
     try:
         port = int(args.get("port") or 22)
     except (TypeError, ValueError):
         return None, "Port SSH invalide."
     if not 1 <= port <= 65535:
         return None, "Port SSH invalide."
-    return {
-        "host": host,
-        "port": port,
-        "username": username,
-        "password": password,
-        "private_key": private_key,
-        "key_passphrase": args.get("key_passphrase") or "",
-    }, None
+    if args.get("password") or args.get("private_key") or args.get("key_passphrase"):
+        return None, (
+            "Un secret SSH ne doit pas transiter dans le chat. Enregistre cette cible et "
+            "saisis toi-même le secret dans l'onglet SSH; Marvin pourra ensuite la piloter "
+            "depuis le chat par son connection_id."
+        )
+    saved = db.find_ssh_connection(host, username, port)
+    if saved:
+        return saved, None
+    return None, (
+        "Aucune connexion SSH enregistrée ne correspond à cette cible. Ouvre l'onglet SSH, "
+        "ajoute la connexion et son secret dans le formulaire protégé, puis relance la demande."
+    )
+
+
+def _target_error(error: str) -> dict[str, Any]:
+    result: dict[str, Any] = {"error": error}
+    if "onglet SSH" in error:
+        result.update({
+            "credentials_ui_required": True,
+            "configuration_path": "/ssh",
+            "configuration_action": "Configurer la connexion SSH",
+        })
+    return result
 
 
 async def list_connections(args: dict[str, Any]) -> dict[str, Any]:
@@ -146,7 +158,7 @@ async def execute(args: dict[str, Any]) -> dict[str, Any]:
     connection_id = str(args.get("connection_id") or "").strip()
     connection, error = resolve_target(args)
     if error:
-        return {"error": error}
+        return _target_error(error)
     assert connection is not None
     if not args.get("confirmed"):
         return {
@@ -179,7 +191,21 @@ async def execute(args: dict[str, Any]) -> dict[str, Any]:
             }
         return result
     except Exception as exc:
-        return {"error": str(exc), "command": command}
+        message = str(exc)
+        lowered = message.casefold()
+        timed_out = "timed out" in lowered or "timeout" in lowered
+        return {
+            "success": False,
+            "error": "Délai de connexion SSH dépassé." if timed_out else message,
+            "error_type": "ssh_timeout" if timed_out else type(exc).__name__,
+            "diagnosis": "indeterminate",
+            "firewall_confirmed": False,
+            "possible_causes": (
+                ["service SSH arrêté", "port filtré", "route absente", "hôte indisponible"]
+                if timed_out else []
+            ),
+            "command": command,
+        }
 
 
 async def execute_multi(args: dict[str, Any]) -> dict[str, Any]:
@@ -255,7 +281,7 @@ async def write_and_run(args: dict[str, Any]) -> dict[str, Any]:
         return blocked
     connection, error = resolve_target(args)
     if error:
-        return {"error": error}
+        return _target_error(error)
     assert connection is not None
     connection_id = str(args.get("connection_id") or "").strip()
     run_command = str(args.get("run_command") or "").strip() or (

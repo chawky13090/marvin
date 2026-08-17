@@ -37,6 +37,7 @@ STREAMS: tuple[PrivacyStream, ...] = (
 
 PERSONAL_STATE_STREAMS: tuple[PrivacyStream, ...] = (
     PrivacyStream("backend/bulk_rename_rollback_store.py", "rollback/bulk-rename/*.json", "free_text", ("root", "operations[].old", "operations[].new", "legacy.source_path"), ("run_id", "root_fingerprint"), "encrypted_full_backup_or_exact_manifest", "retention_or_confirmed_rollback"),
+    PrivacyStream("backend/ssh_transport.py", "ssh_known_hosts", "network_identifier", ("hostname", "public_key"), ("hostname",), "encrypted_full_backup", "exact_host_entry_or_file_delete"),
 )
 
 

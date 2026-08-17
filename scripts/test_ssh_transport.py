@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -36,7 +37,9 @@ def main() -> int:
         assert ssh_transport.load_private_key("PRIVATE", "phrase") == "parsed-key"
 
     client = MagicMock()
-    with patch.object(ssh_transport.paramiko, "SSHClient", return_value=client):
+    with tempfile.TemporaryDirectory() as directory, (
+        patch.object(ssh_transport, "KNOWN_HOSTS_PATH", Path(directory) / "known_hosts")
+    ), patch.object(ssh_transport.paramiko, "SSHClient", return_value=client):
         result = ssh_transport.connect(
             {
                 "host": "server.example",
@@ -57,7 +60,26 @@ def main() -> int:
         "auth_timeout": 9,
         "password": "secret",
     }
-    client.set_missing_host_key_policy.assert_called_once()
+    policy = client.set_missing_host_key_policy.call_args.args[0]
+    assert isinstance(policy, ssh_transport.TrustOnFirstUsePolicy)
+
+    with tempfile.TemporaryDirectory() as directory, patch.object(
+        ssh_transport, "KNOWN_HOSTS_PATH", Path(directory) / "known_hosts"
+    ):
+        first_key = ssh_transport.paramiko.RSAKey.generate(1024)
+        changed_key = ssh_transport.paramiko.RSAKey.generate(1024)
+        policy_client = MagicMock()
+        policy_client.get_host_keys.return_value = ssh_transport.paramiko.HostKeys()
+        policy.missing_host_key(policy_client, "server.example", first_key)
+        assert ssh_transport.KNOWN_HOSTS_PATH.exists()
+        pinned = ssh_transport.paramiko.HostKeys(str(ssh_transport.KNOWN_HOSTS_PATH))
+        assert pinned.lookup("server.example")[first_key.get_name()] == first_key
+        try:
+            policy.missing_host_key(policy_client, "server.example", changed_key)
+        except ssh_transport.paramiko.BadHostKeyException:
+            pass
+        else:
+            raise AssertionError("Une clé SSH changée doit être refusée.")
 
     import tools
     from api import ssh as ssh_api

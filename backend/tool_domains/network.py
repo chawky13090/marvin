@@ -1016,33 +1016,96 @@ async def execute_net_topology_diagram(args: dict) -> dict:
 
 
 async def execute_net_subnet_sweep(args: dict) -> dict:
-    """Sweep TCP borné d'un CIDR pour repérer les hôtes actifs sur ports courants."""
+    """Cartographie TCP bornée d'un CIDR local sur des ports courants.
+
+    Cette primitive agrège le réseau en un seul appel. Elle évite au modèle de lancer un
+    appel ``net_nmap_scan`` par adresse, tout en restant strictement bornée.
+    """
     cidr = (args.get("cidr") or args.get("target") or "").strip()
-    confirmed = bool(args.get("confirmed", False))
     ports_raw = args.get("ports") or "22,80,443,445,3389,5985,8080"
     try:
         ports = _net_parse_ports(ports_raw, limit=32)
     except Exception as e:
         return {"error": f"Ports invalides : {e}"}
-    targets, blocked = _net_targets(cidr, confirmed=confirmed, max_hosts=512 if confirmed else 128)
+    try:
+        network = _ipaddress.ip_network(cidr, strict=False)
+    except ValueError as exc:
+        return {"error": f"CIDR local invalide : {exc}"}
+    if not (network.is_private or network.is_link_local):
+        return {
+            "success": False,
+            "scopeRejected": True,
+            "message": "Le balayage agrégé est limité aux réseaux privés ou link-local.",
+        }
+    targets, blocked = _net_targets(cidr, max_hosts=512)
     if blocked:
         return blocked
+    probe_count = len(targets) * len(ports)
+    if probe_count > 4096:
+        return {
+            "success": False,
+            "needsClarification": True,
+            "scopeRejected": True,
+            "message": "Balayage trop large : réduisez le CIDR ou le nombre de ports.",
+            "target_count": len(targets),
+            "port_count": len(ports),
+            "probe_count": probe_count,
+            "max_probes": 4096,
+        }
     timeout = max(0.15, min(float(args.get("timeout", 0.45)), 2.0))
     sem = asyncio.Semaphore(220)
 
-    async def scan_host(host: str):
+    async def bounded_probe(host: str, port: int) -> dict:
         async with sem:
-            probes = await asyncio.gather(*[_net_tcp_probe(host, p, timeout=timeout) for p in ports])
+            return await _net_tcp_probe(host, port, timeout=timeout)
+
+    async def scan_host(host: str):
+        probes = await asyncio.gather(*[bounded_probe(host, p) for p in ports])
         opened = [p["port"] for p in probes if p.get("open")]
         return {"host": host, "open_ports": opened, "alive": bool(opened)}
 
     results = await asyncio.gather(*[scan_host(h) for h in targets])
-    alive = [r for r in results if r["alive"]]
+    by_host = {result["host"]: result for result in results if result["alive"]}
+    tcp_responsive_count = len(by_host)
+
+    # Les tentatives TCP sur un même segment forcent Windows à résoudre les voisins
+    # en ARP. Croiser ensuite le cache permet de voir aussi les téléphones, imprimantes
+    # et objets connectés qui n'exposent aucun des ports testés. Le signal reste nommé
+    # « arp_neighbor » : il ne prétend pas prouver un service applicatif disponible.
+    arp = await execute_net_scan_local({})
+    arp_neighbor_count = 0
+    for device in arp.get("devices", []):
+        try:
+            address = _ipaddress.ip_address(str(device.get("ip") or ""))
+        except ValueError:
+            continue
+        if address not in network or address in (network.network_address, network.broadcast_address):
+            continue
+        arp_neighbor_count += 1
+        host = str(address)
+        item = by_host.setdefault(host, {"host": host, "open_ports": [], "alive": True})
+        item["mac"] = device.get("mac", "")
+        item["neighbor_type"] = device.get("type", "")
+        item["signals"] = (["tcp_open_port"] if item["open_ports"] else []) + ["arp_neighbor"]
+    for item in by_host.values():
+        item.setdefault("signals", ["tcp_open_port"])
+    alive = sorted(by_host.values(), key=lambda item: _ipaddress.ip_address(item["host"]))
     return {
+        "success": True,
         "cidr": cidr,
         "ports": ports,
         "hosts": alive,
+        "active_host_count": len(alive),
+        "tcp_responsive_count": tcp_responsive_count,
+        "arp_neighbor_count": arp_neighbor_count,
         "scanned_hosts": len(targets),
+        "probe_count": probe_count,
+        "discovery_mode": "bounded_tcp_and_arp_sweep",
+        "coverage_caveat": (
+            "Un appareil est retenu si un port testé répond ou s'il apparaît comme voisin ARP. "
+            "L'isolation Wi-Fi, un VLAN distinct ou un équipement totalement silencieux peut "
+            "encore le rendre invisible; ARP prouve un voisin, pas un service disponible."
+        ),
         "summary": f"{len(alive)} hôte(s) actif(s) repéré(s) sur {len(targets)} testé(s)",
     }
 

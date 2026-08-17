@@ -3,6 +3,7 @@
 import { Command, Menu } from 'lucide-react';
 import { useChatStatus } from '@/lib/contexts/ChatContext';
 import { useNavigationLayout } from '@/lib/contexts/NavigationContext';
+import ThemeControl from '@/components/layout/ThemeControl';
 
 const ROUTE_LABELS = Object.freeze({
   '/': 'Conversation',
@@ -72,6 +73,7 @@ export default function ContextBar() {
       />
 
       <div className="context-bar__secondary">
+        <ThemeControl />
         <span
           className={`context-bar__status${chatStatus.isLoading ? ' context-bar__status--active' : ''}`}
           role="status"

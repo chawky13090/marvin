@@ -49,6 +49,31 @@ async def _run() -> None:
         "host": "10.0.0.2", "username": "marvin", "password": "x", "port": "invalid"
     })
     assert error == "Port SSH invalide."
+    with patch.object(ssh_domain.db, "find_ssh_connection", return_value=connection):
+        resolved, error = ssh_domain.resolve_target({
+            "host": "10.0.0.2", "username": "marvin"
+        })
+    assert error is None and resolved["id"] == "s1"
+    with patch.object(ssh_domain.db, "find_ssh_connection", return_value=None):
+        resolved, error = ssh_domain.resolve_target({
+            "host": "10.0.0.3", "username": "marvin"
+        })
+    assert resolved is None and "onglet SSH" in error
+
+    with (
+        patch.object(ssh_domain.db, "find_ssh_connection", return_value=None),
+        patch.object(ssh_domain.security, "guard_result", return_value=None),
+    ):
+        missing_target = await ssh_domain.execute({
+            "host": "10.0.0.3", "username": "marvin", "command": "hostname"
+        })
+    assert missing_target["credentials_ui_required"] is True
+    assert missing_target["configuration_path"] == "/ssh"
+
+    resolved, error = ssh_domain.resolve_target({
+        "host": "10.0.0.2", "username": "marvin", "password": "secret"
+    })
+    assert resolved is None and "ne doit pas transiter" in error
 
     with (
         patch.object(ssh_domain.db, "get_ssh_connection", return_value=connection),

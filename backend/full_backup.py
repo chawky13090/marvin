@@ -44,6 +44,7 @@ AUTHORITATIVE_ROOT_FILES = frozenset({
     "research_swarm_jobs.json",
     "skills_learning_log.json",
     "skills_stats.json",
+    "ssh_known_hosts",
     "truth_ledger.jsonl",
     "windows_secrets.dpapi.json",
     "windows_secrets.metadata.json",

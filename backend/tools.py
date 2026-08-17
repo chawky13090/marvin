@@ -3132,7 +3132,7 @@ TOOLS_SPEC = [
        ["query"]),
     _t("winget_list_upgrades", "Liste les logiciels installés ayant une mise à jour disponible (Winget).",
        {}, []),
-    _t("winget_list_installed", "Liste les logiciels INSTALLÉS sur le PC (filtrable par nom) — pour les voir/désinstaller.",
+    _t("winget_list_installed", "Inventaire large des applications Windows connues de Winget (Win32, ARP et MSIX), filtrable par nom. Le reçu complet est affichable dans le chat; ne relance pas l'outil pour énumérer la suite.",
        {"query": {"type": "string", "description": "Filtre optionnel (nom partiel)"}}, []),
     _t("winget_install", "Outil privilégié pour installer un logiciel Windows : installation silencieuse puis vérification dans l'inventaire. Ne jamais lancer un second installateur après un succès vérifié.",
        {"id":        {"type": "string",  "description": "ID exact du paquet (ex: 7zip.7zip) — préférable"},
@@ -3648,7 +3648,7 @@ TOOLS_SPEC = [
         "max_hops": {"type": "integer", "description": "Nombre maximum de sauts (défaut 15, max 30)"}},
        ["host"]),
 
-    _t("net_scan_local", "Lit le cache ARP local pour inventorier les voisins récemment vus. Ce n'est pas un scan actif et il peut omettre des appareils silencieux.",
+    _t("net_scan_local", "Lit seulement le cache ARP local. Pour scanner réellement tout un réseau privé /24 en un appel, utilise net_subnet_sweep.",
        {}, []),
 
     _t("net_whois", "Requête WHOIS sur un domaine ou une adresse IP pour obtenir les infos d'enregistrement.",
@@ -3738,11 +3738,10 @@ TOOLS_SPEC = [
     _t("quiz_stats", "Statistiques de révision par sujet : nombre de fiches, fiches dues maintenant, réussite cumulée.",
        {}, []),
 
-    _t("net_subnet_sweep", "Sweep TCP borné d'un CIDR local pour repérer les hôtes actifs sur des ports courants.",
+    _t("net_subnet_sweep", "Cartographie active et agrégée d'un CIDR privé (notamment /24) : croise en un seul appel les ports TCP répondants et les voisins ARP, puis réserve les diagnostics détaillés aux hôtes pertinents.",
        {"cidr":      {"type": "string",  "description": "CIDR, ex: 192.168.1.0/24"},
         "ports":     {"type": "string",  "description": "Ports de détection, défaut 22,80,443,445,3389,5985,8080"},
-        "timeout":   {"type": "number",  "description": "Timeout court par port"},
-        "confirmed": {"type": "boolean", "description": "Confirmation pour sous-réseaux larges"}},
+        "timeout":   {"type": "number",  "description": "Timeout court par port"}},
        ["cidr"]),
 
     _t("net_route_diagnostics", "Diagnostic réseau complet : config locale, DNS, ping internet/cible et traceroute optionnel. Utile pour « pourquoi je n'ai pas internet ».",
@@ -4317,16 +4316,14 @@ TOOLS_SPEC = [
        ["name", "host", "username"]),
 
     _t("ssh_exec",
-       "Exécute une commande sur un serveur SSH — connexion SAUVEGARDÉE (connection_id, voir "
-       "ssh_list) OU PONCTUELLE (host + username + password ou private_key, sans l'enregistrer "
-       "au préalable — pour « connecte-toi à cette IP avec ces identifiants »). Requiert "
+       "Exécute une commande via une connexion SSH enregistrée et protégée par le coffre DPAPI. "
+       "Utilise connection_id (voir ssh_list), ou host/username pour résoudre une connexion "
+       "déjà enregistrée. Les mots de passe et clés ne transitent jamais dans le chat. Requiert "
        "confirmation explicite dans tous les cas.",
        {"connection_id": {"type": "string", "description": "ID d'une connexion SSH déjà sauvegardée (voir ssh_list)"},
-        "host": {"type": "string", "description": "Adresse du serveur (connexion ponctuelle, alternative à connection_id)"},
+        "host": {"type": "string", "description": "Adresse d'une connexion déjà enregistrée (alternative à connection_id)"},
         "port": {"type": "integer", "description": "Port SSH (défaut 22)"},
-        "username": {"type": "string", "description": "Utilisateur SSH (connexion ponctuelle)"},
-        "password": {"type": "string", "description": "Mot de passe (connexion ponctuelle, si pas de clé)"},
-        "private_key": {"type": "string", "description": "Clé privée SSH complète (connexion ponctuelle, si pas de mot de passe)"},
+        "username": {"type": "string", "description": "Utilisateur de la connexion enregistrée"},
         "command": {"type": "string", "description": "Commande à exécuter sur le serveur distant"},
         "timeout": {"type": "integer", "description": "Délai maximum en secondes (défaut 30, max 120)"},
         "confirmed": {"type": "boolean", "description": "Confirmation de l'utilisateur (obligatoire avant exécution)"}},
@@ -4339,15 +4336,13 @@ TOOLS_SPEC = [
        ["connection_ids", "command"]),
     _t("ssh_write_and_run",
        "Écrit un script (texte généré) sur une machine distante via SFTP PUIS l'exécute — "
-       "connexion sauvegardée (connection_id) OU ponctuelle (host+username+password/private_key). "
+       "connexion sauvegardée (connection_id) ou cible résolue vers une connexion déjà enregistrée. "
        "Pour « crée un script d'installation de X et lance-le sur ce serveur » — plus fiable "
        "qu'un heredoc dans ssh_exec (pas de souci d'échappement de quotes).",
        {"connection_id": {"type": "string", "description": "ID d'une connexion SSH sauvegardée"},
         "host": {"type": "string", "description": "Adresse du serveur (connexion ponctuelle)"},
         "port": {"type": "integer", "description": "Port SSH (défaut 22)"},
-        "username": {"type": "string", "description": "Utilisateur SSH (connexion ponctuelle)"},
-        "password": {"type": "string", "description": "Mot de passe (connexion ponctuelle)"},
-        "private_key": {"type": "string", "description": "Clé privée SSH (connexion ponctuelle)"},
+        "username": {"type": "string", "description": "Utilisateur d'une connexion enregistrée"},
         "content": {"type": "string", "description": "Contenu du script à écrire sur la machine distante"},
         "remote_path": {"type": "string", "description": "Chemin distant du script (ex. /tmp/install.sh)"},
         "run_command": {"type": "string", "description": "Commande d'exécution (défaut : chmod +x puis lance le script)"},

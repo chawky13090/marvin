@@ -464,6 +464,35 @@ def compact_tool_result(
 ) -> str:
     """Projette un résultat borné pour le contexte LLM sans toucher au reçu complet."""
     serialized = json.dumps(result, ensure_ascii=False)
+    if tool_name in {
+        "pc_installed_software",
+        "winget_list_installed",
+        "windows_task",
+    } and isinstance(result, dict):
+        payload = result.get("result") if tool_name == "windows_task" else result
+        action = str(result.get("action") or "")
+        if isinstance(payload, dict) and (
+            tool_name != "windows_task" or action == "software.list"
+        ):
+            entries = payload.get("apps") or payload.get("software")
+            if isinstance(entries, list):
+                projection = {
+                    "success": result.get("success", payload.get("success")),
+                    "action": action or None,
+                    "count": payload.get("count", len(entries)),
+                    "inventory_scope": payload.get("inventory_scope"),
+                    "coverage_caveat": payload.get("coverage_caveat"),
+                    "full_result_available_in_ui": True,
+                    "instruction": (
+                        "Le reçu complet est disponible dans la carte outil du chat. "
+                        "Ne relance pas l'inventaire et ne prétends pas que la liste complète "
+                        "est inaccessible; invite l'utilisateur à afficher les éléments suivants."
+                    ),
+                    "preview": entries[:12],
+                    "preview_count": min(12, len(entries)),
+                    "omitted_from_model_context": max(0, len(entries) - 12),
+                }
+                return _bounded_json_projection(projection, max_chars)
     if (
         tool_name == "file_list"
         and isinstance(result, dict)

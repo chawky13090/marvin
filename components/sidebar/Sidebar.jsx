@@ -357,8 +357,8 @@ export default function Sidebar({ displayMode = 'classic', onRequestClose, onReq
           left: 0, top: 0, bottom: 0,
           width: isMobile ? 'var(--sidebar-expanded)' : (expanded ? 'var(--sidebar-expanded)' : 'var(--sidebar-collapsed)'),
           transform: isMobile ? (mobileOpen ? 'translateX(0)' : 'translateX(-100%)') : 'none',
-          background: '#0d0d0d',
-          borderRight: '1px solid rgba(228, 228, 231,0.06)',
+          background: 'var(--sidebar-background)',
+          borderRight: '1px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
           zIndex: 1001,
@@ -551,7 +551,7 @@ export default function Sidebar({ displayMode = 'classic', onRequestClose, onReq
                         background: 'var(--accent-primary)',
                         boxShadow: '0 0 0 3px rgba(255,255,255,0.055)',
                         animation: 'pulse 1.4s ease-in-out infinite',
-                        border: '2px solid #0d0d0d',
+                        border: '2px solid var(--sidebar-background)',
                       }}
                     />
                   )}

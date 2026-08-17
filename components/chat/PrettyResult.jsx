@@ -101,6 +101,45 @@ const C = {
   chip: { display: 'inline-block', padding: '1px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', fontSize: 12, margin: '2px 4px 2px 0' },
 };
 
+function ArrayValue({ values, depth }) {
+  const pageSize = 25;
+  const [visibleCount, setVisibleCount] = useState(pageSize);
+  const visible = values.slice(0, visibleCount);
+  const remaining = Math.max(0, values.length - visibleCount);
+  if (values.every((x) => typeof x !== 'object' || x === null)) {
+    return (
+      <span>
+        {visible.map((x, i) => <span key={i} style={C.chip}>{String(x)}</span>)}
+        {remaining > 0 && (
+          <button type="button" onClick={() => setVisibleCount(Math.min(values.length, visibleCount + pageSize))}
+            style={{ ...C.chip, color: 'var(--accent-secondary)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+            Afficher {Math.min(pageSize, remaining)} de plus
+          </button>
+        )}
+      </span>
+    );
+  }
+  return (
+    <div style={{ width: '100%' }}>
+      {visible.map((item, i) => (
+        <div key={i} style={{ ...C.sub, marginBottom: 6 }}><ObjectRows obj={item} depth={depth + 1} /></div>
+      ))}
+      {remaining > 0 && (
+        <button type="button" onClick={() => setVisibleCount(Math.min(values.length, visibleCount + pageSize))}
+          style={{ padding: '7px 11px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-glass)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: 12 }}>
+          Afficher {Math.min(pageSize, remaining)} élément(s) de plus ({remaining} restant(s))
+        </button>
+      )}
+      {visibleCount > pageSize && (
+        <button type="button" onClick={() => setVisibleCount(pageSize)}
+          style={{ marginLeft: 8, padding: '7px 11px', border: 0, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>
+          Replier
+        </button>
+      )}
+    </div>
+  );
+}
+
 function Value({ v, k, depth }) {
   if (v === null || v === undefined || v === '') return <span style={{ color: 'var(--text-muted)' }}>—</span>;
   if (k === 'is_overdue' && v === true) {
@@ -114,6 +153,9 @@ function Value({ v, k, depth }) {
     return <span>{v.toLocaleString('fr-FR')}</span>;
   }
   if (typeof v === 'string') {
+    if (k === 'configuration_path' && v.startsWith('/')) {
+      return <a href={v} style={{ color: 'var(--accent-secondary)', fontWeight: 650 }}>Ouvrir la configuration</a>;
+    }
     if ((k === 'status' || k === 'Status' || k === 'State') && STATUS_COLORS[v.toLowerCase()]) {
       const color = STATUS_COLORS[v.toLowerCase()];
       return <span style={{ ...C.chip, background: `${color}22`, color, fontWeight: 600 }}>{v}</span>;
@@ -126,18 +168,7 @@ function Value({ v, k, depth }) {
   }
   if (Array.isArray(v)) {
     if (v.length === 0) return <span style={{ color: 'var(--text-muted)' }}>aucun</span>;
-    // tableau de primitives → chips ; tableau d'objets → sous-cartes
-    if (v.every((x) => typeof x !== 'object' || x === null)) {
-      return <span>{v.slice(0, 40).map((x, i) => <span key={i} style={C.chip}>{String(x)}</span>)}{v.length > 40 && <span style={{ color: 'var(--text-muted)' }}>+{v.length - 40}</span>}</span>;
-    }
-    return (
-      <div style={{ width: '100%' }}>
-        {v.slice(0, 25).map((item, i) => (
-          <div key={i} style={{ ...C.sub, marginBottom: 6 }}><ObjectRows obj={item} depth={depth + 1} /></div>
-        ))}
-        {v.length > 25 && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>+{v.length - 25} de plus…</div>}
-      </div>
-    );
+    return <ArrayValue values={v} depth={depth} />;
   }
   if (typeof v === 'object') {
     return <div style={C.sub}><ObjectRows obj={v} depth={depth + 1} /></div>;
@@ -186,7 +217,7 @@ export default function PrettyResult({ result }) {
         {raw ? '✨ Affichage lisible' : '{ } Voir en JSON'}
       </button>
       {raw && (
-        <pre style={{ marginTop: 6, fontSize: 11, background: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 8, overflowX: 'auto', color: 'var(--text-secondary)' }}>
+        <pre style={{ marginTop: 6, fontSize: 11, background: 'var(--code-background-strong)', padding: 10, borderRadius: 8, overflowX: 'auto', color: 'var(--text-secondary)' }}>
           {JSON.stringify(result, null, 2)}
         </pre>
       )}

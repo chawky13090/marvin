@@ -65,6 +65,39 @@ async def _run() -> None:
     assert too_large["needsClarification"] is True
     assert "requiresConfirmation" not in too_large
 
+    async def fake_probe(host: str, port: int, timeout: float = 0.8) -> dict:
+        return {"host": host, "port": port, "open": host.endswith(".1") and port == 443}
+
+    async def fake_arp(_args: dict) -> dict:
+        return {
+            "success": True,
+            "devices": [
+                {"ip": "192.168.50.2", "mac": "aa-bb-cc-dd-ee-02", "type": "dynamic"},
+                {"ip": "192.168.99.2", "mac": "aa-bb-cc-dd-ee-99", "type": "dynamic"},
+            ],
+        }
+
+    with (
+        patch.object(network, "_net_tcp_probe", new=fake_probe),
+        patch.object(network, "execute_net_scan_local", new=fake_arp),
+    ):
+        sweep = await network.execute_net_subnet_sweep({
+            "cidr": "192.168.50.0/30", "ports": "22,443"
+        })
+    assert sweep["success"] is True
+    assert sweep["scanned_hosts"] == 2 and sweep["probe_count"] == 4
+    assert sweep["hosts"] == [
+        {"host": "192.168.50.1", "open_ports": [443], "alive": True, "signals": ["tcp_open_port"]},
+        {"host": "192.168.50.2", "open_ports": [], "alive": True, "mac": "aa-bb-cc-dd-ee-02", "neighbor_type": "dynamic", "signals": ["arp_neighbor"]},
+    ]
+    assert sweep["tcp_responsive_count"] == 1 and sweep["arp_neighbor_count"] == 1
+    assert "confirmed" not in tools.TOOLS_SPEC[
+        next(i for i, spec in enumerate(tools.TOOLS_SPEC) if spec["function"]["name"] == "net_subnet_sweep")
+    ]["function"]["parameters"]["properties"]
+
+    public_sweep = await network.execute_net_subnet_sweep({"cidr": "8.8.8.0/24"})
+    assert public_sweep["scopeRejected"] is True
+
     subnet = await network.execute_net_subnet_calc(
         {"cidr": "192.0.2.0/24", "new_prefix": 26}
     )

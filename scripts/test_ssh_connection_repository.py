@@ -73,6 +73,11 @@ def main() -> int:
             ).fetchone()
         assert raw[0:3] == ("", "", "") and raw[3]
 
+        resolved = repository.find_connection("10.0.0.2", "marvin", 22)
+        assert resolved and resolved["id"] == "ssh-1"
+        assert resolved["password"] == "secret"
+        assert repository.find_connection("10.0.0.2", "other", 22) is None
+
         listed = repository.list_connections()
         assert len(listed) == 2
         assert "password" not in listed[0] and "private_key" not in listed[0]
@@ -151,6 +156,7 @@ def main() -> int:
 
     assert database.list_ssh_connections is ssh_connections.list_ssh_connections
     assert database.get_ssh_connection is ssh_connections.get_ssh_connection
+    assert database.find_ssh_connection is ssh_connections.find_ssh_connection
     assert database.save_ssh_connection is ssh_connections.save_ssh_connection
     print("SSH Repository OK - compatibilité, secrets, CRUD, rollback et façade.")
     return 0

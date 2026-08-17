@@ -531,7 +531,17 @@ async def execute_pc_installed_software(args: dict) -> dict:
         except Exception:
             return {"error": "Impossible de lire la liste des logiciels installés."}
         apps = [a for a in apps if a.get("name")]
-        return {"success": True, "count": len(apps), "software": apps[:600],
-                "message": f"{len(apps)} logiciel(s) installé(s) détecté(s) sur ce PC."}
+        return {
+            "success": True,
+            "count": len(apps),
+            "software": apps[:600],
+            "inventory_scope": "windows_uninstall_registry",
+            "full_result_available_in_ui": True,
+            "coverage_caveat": (
+                "Cette source couvre les entrées Désinstaller du Registre, pas toutes les "
+                "applications MSIX ni les exécutables portables."
+            ),
+            "message": f"{len(apps)} logiciel(s) enregistré(s) détecté(s) sur ce PC.",
+        }
     except Exception as e:
         return {"error": str(e)}

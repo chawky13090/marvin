@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.681.0, 364 outils, 396 routes.** Architecture dans
+> **État courant : v2.682.0, 364 outils, 396 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,25 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.681.0)
+## 9. État actuel (v2.682.0)
+
+**v2.682 (inventaires complets, SSH épinglé et thèmes adaptatifs)** : le balayage d'un réseau
+privé `/24` est désormais un unique parcours borné qui croise sondes TCP et voisins ARP; il
+ne confond pas l'absence de port ouvert avec l'absence d'appareil et réserve Nmap aux hôtes
+pertinents. L'inventaire applicatif Winget reste complet dans le reçu UI, paginable par lots de
+25, tandis que le contexte modèle reçoit un aperçu borné et l'interdiction de relancer ou de
+prétendre que la suite est perdue. Depuis le chat, SSH résout uniquement des connexions
+enregistrées sous DPAPI; aucun mot de passe ou clé privée n'entre dans le schéma outil, et la
+clé d'hôte est épinglée par TOFU dans un registre sauvegardé et inventorié. Les timeouts restent
+indéterminés, jamais attribués sans preuve au pare-feu. L'interface conserve le sombre actuel
+par défaut et permet de choisir à la volée Clair, Manga, Médiéval ou Cyberpunk; le choix local
+est restauré avant hydratation, le contrôle se compacte sur mobile et le robot, le pilotage et
+le composeur conservent leurs fonctions. Validation réelle : build Next.js 16.2.12, inventaire
+Winget de 227 entrées et balayage local de 254 adresses/1 778 sondes révélant 11 voisins ou
+hôtes répondants. Rollback : réversion atomique de v2.682; aucune donnée existante n'est
+réécrite. La préférence `marvin_theme` peut être supprimée du stockage local; le fichier
+`data/ssh_known_hosts`, s'il a été créé, peut rester sans effet ou être retiré séparément après
+vérification manuelle des connexions concernées.
 
 **v2.681 (chat réparable et diagnostics honnêtes)** : un second tour refusé par le verrou de
 conversation est maintenant terminalisé sans lancer le producteur; il ne peut plus rester

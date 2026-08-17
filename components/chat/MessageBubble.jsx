@@ -830,7 +830,7 @@ function ToolCallInline({ tool, conversationId, viewMode, onConfirm, onCancel, o
             <strong>Paramètres :</strong>
             {Object.entries(tool.args).map(([key, val]) => (
               <div key={key} style={{ marginTop: '2px' }}>
-                <span style={{ color: 'var(--accent-secondary)' }}>{key}</span>: <span style={{ color: 'var(--text-primary)' }}>{typeof val === 'string' ? val : JSON.stringify(val)}</span>
+                <span style={{ color: 'var(--accent-secondary)' }}>{key}</span>: <span style={{ color: 'var(--text-primary)' }}>{/(password|passphrase|private_key|token|secret|credential)/i.test(key) ? '••••••••' : typeof val === 'string' ? val : JSON.stringify(val)}</span>
               </div>
             ))}
           </div>
