@@ -26,7 +26,7 @@ import { createContext, useContext, useState, useCallback, useRef, useEffect } f
 import { useVoice } from '@/lib/hooks/useVoice';
 import { BACKEND_URL } from '@/lib/backend';
 import { DEFAULT_CORTEX_CONTRACT, resetOneShot } from '@/lib/cortex';
-import { durableChatEvents } from '@/lib/chatStream';
+import { ChatStreamTransportError, durableChatEvents } from '@/lib/chatStream';
 
 const ChatContext = createContext(null);
 
@@ -490,7 +490,13 @@ export function ChatProvider({ children }) {
       }
     } catch (err) {
       if (err.name !== 'AbortError') {
-        console.error('[ChatContext] Erreur streaming:', err);
+        // Une coupure réseau bornée est déjà rendue dans l'interface. En développement,
+        // console.error déclenche l'overlay Turbopack et masque ce message exploitable.
+        if (err instanceof ChatStreamTransportError) {
+          console.warn('[ChatContext] Transport du chat indisponible après reconnexion bornée.');
+        } else {
+          console.error('[ChatContext] Erreur streaming:', err);
+        }
         // Give a meaningful error message even when err.message is empty
         const msg = err.message
           || err.toString()

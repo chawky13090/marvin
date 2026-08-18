@@ -5,6 +5,21 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-18 — v2.686.0 — reconnexion du chat après redémarrage backend
+
+- Incident : un prompt actif a rencontré `TypeError: Failed to fetch` pendant le redémarrage
+  contrôlé du backend v2.685; le service était à nouveau prêt environ 2,5 secondes plus tard.
+- Cause : le transport SSE n'accordait que deux reconnexions séparées de 250 ms, puis
+  `console.error` déclenchait l'overlay Next.js en développement malgré l'erreur rendue dans UI.
+- Correction : six reconnexions exponentielles bornées à 4 secondes, même `requestId` et même
+  curseur pour interdire tout rejeu logique; 4xx non retentés; erreur terminale française et
+  `console.warn` pour l'indisponibilité réseau déjà traitée par l'interface.
+- Sécurité et données : aucun payload supplémentaire, secret ou contenu journalisé. Les retries
+  restent bornés et utilisent l'idempotence durable existante; aucune mutation métier directe.
+- Validation : test de coupure sur trois connexions, stabilité du requestId, reprise SSE,
+  refus de retry sur 422 et échec terminal borné; baseline frontend verte.
+- Rollback : réversion atomique du commit v2.686; aucune donnée persistante n'est modifiée.
+
 ## 2026-08-18 — v2.685.0 — SNMPv3 protégé et découverte LLDP/CDP
 
 - Demande : poursuivre la gestion portable des switches, routeurs, pare-feu et serveurs après

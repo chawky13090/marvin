@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.685.0, 364 outils, 400 routes.** Architecture dans
+> **État courant : v2.686.0, 364 outils, 400 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.685.0)
+## 9. État actuel (v2.686.0)
+
+**v2.686 (reprise du chat après redémarrage)** : le transport SSE conserve le même identifiant
+de requête et le dernier curseur reçu pendant six reconnexions à délai exponentiel borné. Une
+coupure courte du backend n'affiche plus l'overlay Turbopack et ne rejoue pas logiquement la
+demande. Les erreurs HTTP 4xx ne sont jamais retentées; une indisponibilité prolongée produit
+un message explicite dans le chat. Rollback : réversion atomique de v2.686; aucune donnée,
+route ou action métier ne change.
 
 **v2.685 (SNMPv3 et voisins réseau en lecture seule)** : les communautés SNMPv2c et les
 secrets ont disparu du schéma visible par le LLM. Les profils SNMPv3 SHA-256/AES-128 sont
