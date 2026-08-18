@@ -5,6 +5,28 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-18 — v2.685.0 — SNMPv3 protégé et découverte LLDP/CDP
+
+- Demande : poursuivre la gestion portable des switches, routeurs, pare-feu et serveurs après
+  la création du registre d'actifs, sans exposer les secrets au modèle et sans mutation réseau.
+- Décision : conserver les 364 outils et faire évoluer `net_snmp_query`. Le chemin normal est
+  désormais SNMPv3 avec profils opaques; SNMPv2c et la communauté `public` disparaissent du
+  contrat LLM. SHA-256/AES-128 est le défaut; SHA-1/no-privacy reste une compatibilité explicite.
+- Sécurité : clés auth/privacy uniquement dans DPAPI, saisie propriétaire via Paramètres,
+  aucune valeur secrète dans SQLite public, reçus ou logs; API sans retour de secret; aucun SET
+  SNMP; walks bornés; suppression d'un profil lié refusée.
+- Données et rollback : migration SQLite 9 transactionnelle, lien `snmp_profile_id` dans les
+  actifs et script `rollback-snmpv3-profiles.py` hors ligne avec sauvegarde SHA-256. La descente
+  refuse tout profil encore présent pour ne jamais orpheliner un secret DPAPI.
+- Observabilité : uniquement état booléen et date du dernier test; aucun identifiant secret ni
+  contenu SNMP sensible n'est journalisé. Pas de nouvel événement technique nécessaire.
+- Validation réelle : build Next.js 16.2.12, contrôle visuel Playwright du panneau SNMPv3,
+  descente v9 vers v8 puis remontée v9 sur la base réelle avec 16 actifs préservés, et gate
+  rapide vert (364 étapes exécutées, 6 étapes live/build explicitement ignorées, zéro échec sur
+  370 attendues). Après redémarrage : backend 2.685.0, 364 outils, frontend HTTP 200, 332 chemins
+  OpenAPI et trois chemins de profils SNMP exposés. Aucun équipement SNMP physique n'était
+  disponible pour une validation multi-constructeur; ce point reste donc non évalué.
+
 ## 2026-08-18 — v2.684.0 — registre portable des actifs d'infrastructure
 
 - Demande : commencer la gestion multi-marque des équipements réseau et des serveurs sans

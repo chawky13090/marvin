@@ -365,6 +365,49 @@ MIGRATIONS: tuple[Migration, ...] = (
             "CREATE INDEX IF NOT EXISTS idx_network_devices_site ON network_devices(site, enabled)",
         ),
     ),
+    Migration(
+        version=9,
+        name="snmpv3-profiles-and-asset-link",
+        statements=(
+            """CREATE TABLE snmp_profiles (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                username TEXT NOT NULL,
+                auth_protocol TEXT NOT NULL CHECK(auth_protocol IN ('sha1','sha256')),
+                priv_protocol TEXT NOT NULL CHECK(priv_protocol IN ('none','aes128')),
+                context_name TEXT NOT NULL DEFAULT '',
+                port INTEGER NOT NULL DEFAULT 161 CHECK(port BETWEEN 1 AND 65535),
+                secret_ref TEXT NOT NULL,
+                last_test_ok INTEGER,
+                last_test_at TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )""",
+            """CREATE TABLE network_devices_v9 (
+                id TEXT PRIMARY KEY, ip TEXT NOT NULL, mac TEXT DEFAULT '', hostname TEXT DEFAULT '',
+                custom_name TEXT DEFAULT '', notes TEXT DEFAULT '',
+                first_seen TEXT NOT NULL DEFAULT (datetime('now')), last_seen TEXT NOT NULL DEFAULT (datetime('now')),
+                asset_type TEXT NOT NULL DEFAULT 'unknown', vendor TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '',
+                os_family TEXT NOT NULL DEFAULT '', role TEXT NOT NULL DEFAULT '', site TEXT NOT NULL DEFAULT '',
+                management_protocols TEXT NOT NULL DEFAULT '[]', tags TEXT NOT NULL DEFAULT '[]',
+                ssh_connection_id TEXT NOT NULL DEFAULT '', snmp_profile_id TEXT NOT NULL DEFAULT '',
+                enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)), source TEXT NOT NULL DEFAULT 'discovery',
+                updated_at TEXT NOT NULL DEFAULT '', UNIQUE(mac, ip)
+            )""",
+            """INSERT INTO network_devices_v9
+               (id,ip,mac,hostname,custom_name,notes,first_seen,last_seen,asset_type,vendor,model,os_family,role,site,
+                management_protocols,tags,ssh_connection_id,snmp_profile_id,enabled,source,updated_at)
+               SELECT id,ip,mac,hostname,custom_name,notes,first_seen,last_seen,asset_type,vendor,model,os_family,role,site,
+                       management_protocols,tags,ssh_connection_id,snmp_profile_id,enabled,source,updated_at
+               FROM network_devices""",
+            "DROP TABLE network_devices",
+            "ALTER TABLE network_devices_v9 RENAME TO network_devices",
+            "CREATE INDEX idx_network_devices_last_seen ON network_devices(last_seen DESC)",
+            "CREATE INDEX idx_network_devices_asset_type ON network_devices(asset_type, enabled)",
+            "CREATE INDEX idx_network_devices_site ON network_devices(site, enabled)",
+            "CREATE INDEX idx_network_devices_snmp_profile ON network_devices(snmp_profile_id)",
+        ),
+    ),
 )
 
 
@@ -433,6 +476,17 @@ def apply_migrations(
         savepoint = f"marvin_migration_{migration.version}"
         connection.execute(f"SAVEPOINT {savepoint}")
         try:
+            # Précondition historique de v9, préparée dans le même savepoint
+            # sans réécrire le checksum de la migration déjà appliquée.
+            if migration.version == 9:
+                columns = {
+                    str(row[1])
+                    for row in connection.execute("PRAGMA table_info(network_devices)")
+                }
+                if "snmp_profile_id" not in columns:
+                    connection.execute(
+                        "ALTER TABLE network_devices ADD COLUMN snmp_profile_id TEXT NOT NULL DEFAULT ''"
+                    )
             for statement in migration.statements:
                 connection.execute(statement)
             connection.execute(

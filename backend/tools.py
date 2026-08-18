@@ -3697,18 +3697,18 @@ TOOLS_SPEC = [
         "new_prefix": {"type": "integer", "description": "Préfixe cible pour découper en sous-réseaux (VLSM), doit être > au préfixe actuel"}},
        ["cidr"]),
 
-    _t("net_snmp_query", "Interroge un équipement réseau via SNMP (v2c) — action='sysinfo' (défaut : nom, "
+    _t("net_snmp_query", "Interroge en lecture seule un actif réseau via SNMPv3 protégé — action='sysinfo' (défaut : nom, "
                           "description, uptime, contact, localisation), action='interfaces' (liste des "
-                          "interfaces réseau + état up/down), ou action='get' avec un OID précis. Utile pour "
-                          "un switch/routeur/serveur exposant SNMP (souvent activé par défaut sur du matériel "
-                          "réseau pro/labo, community 'public' fréquente en lecture seule).",
-       {"host":      {"type": "string",  "description": "IP ou nom de l'équipement SNMP"},
-        "community": {"type": "string",  "description": "Community SNMP (défaut 'public')"},
+                          "interfaces réseau + état up/down), action='neighbors' (LLDP/CDP), ou action='get' "
+                          "avec un OID précis. Le profil secret est résolu côté backend et n'entre jamais dans le chat.",
+       {"device_id": {"type": "string",  "description": "Identifiant de l'actif enregistré (recommandé)"},
+        "host":      {"type": "string",  "description": "IP ou nom de l'équipement SNMP"},
+        "profile_id":{"type": "string",  "description": "Profil SNMPv3 opaque si l'actif n'en porte pas"},
         "port":      {"type": "integer", "description": "Port SNMP, défaut 161"},
-        "action":    {"type": "string",  "enum": ["sysinfo", "interfaces", "get"], "description": "Type de requête (défaut sysinfo)"},
+        "action":    {"type": "string",  "enum": ["sysinfo", "interfaces", "neighbors", "get"], "description": "Type de requête (défaut sysinfo)"},
         "oid":       {"type": "string",  "description": "OID précis pour action='get' (ex: 1.3.6.1.2.1.1.1.0)"},
         "timeout":   {"type": "integer", "description": "Timeout en secondes (défaut 4)"}},
-       ["host"]),
+       []),
 
     _t("net_topology_diagram", "Génère un diagramme visuel de topologie réseau (image affichée directement dans "
                                 "le chat) — passerelle au centre, appareils autour. Sans 'hosts', scanne le réseau "
@@ -3815,6 +3815,7 @@ TOOLS_SPEC = [
         "management_protocols": {"type": "array", "items": {"type": "string"}, "description": "Protocoles disponibles, sans identifiants"},
         "tags": {"type": "array", "items": {"type": "string"}},
         "ssh_connection_id": {"type": "string", "description": "Référence opaque vers une connexion SSH protégée par DPAPI"},
+        "snmp_profile_id": {"type": "string", "description": "Référence opaque vers un profil SNMPv3 protégé par DPAPI"},
         "enabled": {"type": "boolean", "description": "Actif autorisé pour les diagnostics"}},
        []),
 

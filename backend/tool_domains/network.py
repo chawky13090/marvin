@@ -15,6 +15,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 import database as db
 import outbound_http
+from repositories.snmp_profiles import repository as snmp_profiles
 
 WinNetworkConfig = Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
 async def _missing_win_network_config(args: dict[str, Any]) -> dict[str, Any]:
@@ -790,77 +791,119 @@ _SNMP_SYSTEM_OIDS = {
 
 _SNMP_IF_TABLE_OIDS = {"ifDescr": "1.3.6.1.2.1.2.2.1.2", "ifOperStatus": "1.3.6.1.2.1.2.2.1.8"}
 
+_SNMP_NEIGHBOR_OIDS = {
+    "lldp_port": "1.0.8802.1.1.2.1.4.1.1.8",
+    "lldp_name": "1.0.8802.1.1.2.1.4.1.1.9",
+    "lldp_description": "1.0.8802.1.1.2.1.4.1.1.10",
+    "cdp_name": "1.3.6.1.4.1.9.9.23.1.2.1.1.6",
+    "cdp_port": "1.3.6.1.4.1.9.9.23.1.2.1.1.7",
+    "cdp_platform": "1.3.6.1.4.1.9.9.23.1.2.1.1.8",
+}
+
+
+def _resolve_snmp_target(args: dict) -> tuple[str, str, dict] | tuple[None, None, dict]:
+    device_id = str(args.get("device_id") or "").strip()
+    profile_id = str(args.get("profile_id") or "").strip()
+    host = str(args.get("host") or "").strip()
+    if device_id:
+        device = db.get_network_device(device_id)
+        if not device or not device.get("enabled"):
+            return None, None, {"error": "Actif d'infrastructure introuvable ou désactivé."}
+        host = str(device.get("ip") or "").strip()
+        profile_id = profile_id or str(device.get("snmp_profile_id") or "").strip()
+    if not host:
+        return None, None, {"error": "Paramètre 'host' ou 'device_id' requis."}
+    if not profile_id:
+        return None, None, {"error": "Aucun profil SNMPv3 n'est lié à cet actif. Configurez-le dans Connexions."}
+    profile = snmp_profiles.get(profile_id, include_secrets=True)
+    if not profile:
+        return None, None, {"error": "Profil SNMPv3 introuvable."}
+    return host, profile_id, profile
+
 
 async def execute_net_snmp_query(args: dict) -> dict:
-    """Interroge un équipement via SNMP (v2c) — 'action'="sysinfo" (infos système : nom,
-    description, uptime, contact, localisation, en un seul appel) ou "interfaces" (liste des
-    interfaces réseau + état up/down, via un walk borné) ou "get" avec un OID précis. Utile
-    pour un switch/routeur/serveur exposant SNMP (souvent activé par défaut sur les
-    équipements réseau pro — community 'public' en lecture seule fréquente en labo)."""
-    host = (args.get("host") or "").strip()
-    if not host:
-        return {"error": "Paramètre 'host' requis."}
-    community = str(args.get("community") or "public").strip()
+    """Lecture SNMPv3 bornée via un profil DPAPI opaque; aucune mutation SNMP n'existe."""
     try:
-        port = int(args.get("port") or 161)
+        requested_port = args.get("port")
+        port = int(requested_port or 161)
         timeout = max(1, min(int(args.get("timeout", 4)), 10))
     except (TypeError, ValueError):
         return {"error": "Port ou timeout SNMP invalide."}
     if not 1 <= port <= 65535:
         return {"error": "Port SNMP invalide : valeur attendue entre 1 et 65535."}
     action = str(args.get("action") or "sysinfo").strip().lower()
-    if action not in {"sysinfo", "interfaces", "get"}:
-        return {"error": "Action SNMP invalide : sysinfo, interfaces ou get attendu."}
+    if action not in {"sysinfo", "interfaces", "neighbors", "get"}:
+        return {"error": "Action SNMP invalide : sysinfo, interfaces, neighbors ou get attendu."}
     oid = str(args.get("oid") or "").strip()
+    host, profile_id, resolved = _resolve_snmp_target(args)
+    if host is None:
+        return resolved
+    profile = resolved
+    if requested_port in {None, ""}:
+        port = int(profile.get("port") or 161)
 
     try:
         from pysnmp.hlapi.v3arch.asyncio import (
-            SnmpEngine, CommunityData, UdpTransportTarget, ContextData,
+            SnmpEngine, UsmUserData, UdpTransportTarget, ContextData,
             ObjectType, ObjectIdentity, get_cmd, walk_cmd,
+            usmHMACSHAAuthProtocol, usmHMAC192SHA256AuthProtocol,
+            usmAesCfb128Protocol, usmNoPrivProtocol,
         )
     except ImportError:
         return {"error": "Module pysnmp non installé côté backend."}
 
     engine = SnmpEngine()
-    auth = CommunityData(community, mpModel=1)  # mpModel=1 → SNMPv2c
+    auth_protocol = usmHMAC192SHA256AuthProtocol if profile["auth_protocol"] == "sha256" else usmHMACSHAAuthProtocol
+    priv_protocol = usmAesCfb128Protocol if profile["priv_protocol"] == "aes128" else usmNoPrivProtocol
+    auth = UsmUserData(
+        profile["username"], profile["auth_key"], profile.get("priv_key") or None,
+        authProtocol=auth_protocol, privProtocol=priv_protocol,
+    )
+    context = ContextData(contextName=str(profile.get("context_name") or ""))
     try:
         transport = await UdpTransportTarget.create((host, port), timeout=timeout, retries=1)
     except Exception as e:
         return {"error": f"Cible SNMP injoignable : {e}"}
 
-    if action == "interfaces":
+    if action in {"interfaces", "neighbors"}:
         results = []
         # v2.155 — bug trouvé en testant contre un hôte sans agent SNMP : sans distinguer
         # "erreur dès le 1er paquet" de "0 résultat légitime", l'outil renvoyait un succès
         # trompeur ("0 interface trouvée") au lieu de signaler l'absence de réponse SNMP.
         got_any_response = False
         try:
-            for base_name, base_oid in _SNMP_IF_TABLE_OIDS.items():
+            tables = _SNMP_IF_TABLE_OIDS if action == "interfaces" else _SNMP_NEIGHBOR_OIDS
+            for base_name, base_oid in tables.items():
                 count = 0
                 async for errind, errstat, errix, varbinds in walk_cmd(
-                        engine, auth, transport, ContextData(), ObjectType(ObjectIdentity(base_oid))):
+                        engine, auth, transport, context, ObjectType(ObjectIdentity(base_oid))):
                     if errind or errstat:
                         break
                     got_any_response = True
                     for vb in varbinds:
                         oid_str, val = str(vb[0]), str(vb[1])
-                        idx = oid_str.rsplit(".", 1)[-1]
+                        suffix = oid_str[len(base_oid):].lstrip(".")
+                        idx = suffix if action == "neighbors" else suffix.rsplit(".", 1)[-1]
                         entry = next((r for r in results if r["index"] == idx), None)
                         if not entry:
                             entry = {"index": idx}
                             results.append(entry)
                         entry[base_name] = val
                         count += 1
-                    if count >= 40:
+                    if count >= (128 if action == "neighbors" else 40):
                         break
         except Exception as e:
-            return {"error": f"Échec du walk SNMP (community/port corrects ? SNMP activé sur la cible ?) : {e}"}
+            snmp_profiles.set_test_result(profile_id, False)
+            return {"error": f"Échec du walk SNMPv3 (profil/port corrects ? SNMP activé ?) : {e}"}
         if not got_any_response:
-            return {"error": f"Aucune réponse SNMP de {host} (community/port corrects ? SNMP activé sur la cible ?)."}
-        for r in results:
-            r["status"] = {"1": "up", "2": "down", "3": "testing"}.get(r.get("ifOperStatus", ""), r.get("ifOperStatus", "?"))
-        return {"success": True, "host": host, "count": len(results), "interfaces": results,
-                "message": f"{len(results)} interface(s) trouvée(s) sur {host}."}
+            snmp_profiles.set_test_result(profile_id, False)
+            return {"error": f"Aucune réponse SNMPv3 de {host} (profil/port corrects ? SNMP activé ?)."}
+        snmp_profiles.set_test_result(profile_id, True)
+        if action == "interfaces":
+            for r in results:
+                r["status"] = {"1": "up", "2": "down", "3": "testing"}.get(r.get("ifOperStatus", ""), r.get("ifOperStatus", "?"))
+            return {"success": True, "host": host, "count": len(results), "interfaces": results, "protocol": "snmpv3", "message": f"{len(results)} interface(s) trouvée(s) sur {host}."}
+        return {"success": True, "host": host, "count": len(results), "neighbors": results, "protocol": "snmpv3", "message": f"{len(results)} voisin(s) LLDP/CDP observé(s) sur {host}."}
 
     # sysinfo (défaut) ou get(oid) : requête simple via get_cmd
     if action == "get":
@@ -872,18 +915,21 @@ async def execute_net_snmp_query(args: dict) -> dict:
 
     try:
         errind, errstat, errix, varbinds = await get_cmd(
-            engine, auth, transport, ContextData(),
+            engine, auth, transport, context,
             *[ObjectType(ObjectIdentity(o)) for o in targets.values()],
         )
     except Exception as e:
+        snmp_profiles.set_test_result(profile_id, False)
         return {"error": f"Échec de la requête SNMP : {e}"}
     if errind:
-        return {"error": f"SNMP : {errind} (community/port corrects ? SNMP activé sur la cible ?)"}
+        snmp_profiles.set_test_result(profile_id, False)
+        return {"error": f"SNMPv3 : {errind} (profil/port corrects ? SNMP activé ?)"}
     if errstat:
         return {"error": f"SNMP : {errstat.prettyPrint()}"}
 
+    snmp_profiles.set_test_result(profile_id, True)
     values = {name: str(vb[1]) for name, vb in zip(targets.keys(), varbinds)}
-    return {"success": True, "host": host, "values": values,
+    return {"success": True, "host": host, "values": values, "protocol": "snmpv3",
             "message": f"Réponse SNMP reçue de {host}."}
 
 

@@ -149,11 +149,13 @@ from repositories.operations import (
     ops_result_set,
 )
 from repositories.network_inventory import (
+    get_network_device,
     get_network_devices,
     register_network_device,
     set_network_device_notes,
     upsert_network_device,
 )
+from repositories.snmp_profiles import repository as snmp_profiles
 from repositories.projects import (
     create_project,
     delete_project,

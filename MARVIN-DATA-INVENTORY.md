@@ -26,6 +26,9 @@ empreintes MAC, constructeur, modèle, rôle, site, protocoles et références o
 connexions SSH. Il n'accepte aucun mot de passe, communauté SNMP, jeton ni clé privée. Les
 métadonnées sont portables avec la sauvegarde SQLite; les secrets restent dans leurs coffres
 DPAPI et doivent être réauthentifiés après migration vers un autre compte ou un autre PC.
+Les profils `snmp_profiles` ne conservent en SQLite que l'utilisateur, les protocoles et une
+référence opaque. Les clés d'authentification et de confidentialité SNMPv3 vivent exclusivement
+dans le coffre DPAPI courant et ne sont ni retournées par l'API de liste ni exposées au modèle.
 
 Les clés publiques SSH apprises au premier contact sont épinglées dans
 `data/ssh_known_hosts`. Ce registre TOFU est inclus dans la sauvegarde chiffrée; un changement

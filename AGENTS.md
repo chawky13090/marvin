@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.684.0, 364 outils, 396 routes.** Architecture dans
+> **État courant : v2.685.0, 364 outils, 400 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -225,7 +225,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.684.0)
+## 9. État actuel (v2.685.0)
+
+**v2.685 (SNMPv3 et voisins réseau en lecture seule)** : les communautés SNMPv2c et les
+secrets ont disparu du schéma visible par le LLM. Les profils SNMPv3 SHA-256/AES-128 sont
+saisis par le propriétaire dans Paramètres > Connexions, conservés sous DPAPI et référencés
+par UUID depuis le registre d'actifs. `net_snmp_query` résout ces références côté backend et
+observe informations système, interfaces et voisins LLDP/CDP sans aucune primitive SET.
+La migration SQLite 9 et sa descente hors ligne sont testées. Rollback : supprimer les profils
+depuis l'interface, arrêter Marvin, puis exécuter `scripts/rollback-snmpv3-profiles.py --confirmed`.
 
 **v2.684 (registre portable des actifs d'infrastructure)** : l'inventaire réseau existant
 devient un registre documenté pour switches, routeurs, pare-feu, serveurs, stockage et postes,

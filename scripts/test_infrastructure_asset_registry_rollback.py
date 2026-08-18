@@ -28,7 +28,9 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="marvin-assets-rollback-") as temporary:
         database = Path(temporary) / "secretary.db"
         with closing(sqlite3.connect(database)) as connection:
-            apply_migrations(connection, MIGRATIONS)
+            # Ce test historique vérifie exclusivement la descente v8 -> v7.
+            # La descente v9 -> v8 dispose de son propre contrat séparé.
+            apply_migrations(connection, MIGRATIONS[:8])
             connection.execute(
                 """INSERT INTO network_devices
                    (id,ip,custom_name,asset_type,vendor,management_protocols)

@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { BACKEND_URL } from '@/lib/backend';
 import { CredentialGroup } from '@/components/settings/CredentialGroup';
 import { ModelSettingsPanel } from '@/components/settings/ModelSettingsPanel';
+import { SNMPProfilePanel } from '@/components/settings/SNMPProfilePanel';
 
 // ── Définition des 3 niveaux de permission ────────────────────────────────────
 const PERMISSION_LEVELS = {
@@ -851,6 +852,8 @@ export default function SettingsPage() {
               ═══════════════════════════════════════════════════════════════════ */}
           {activeTab === 'connections' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+              <SNMPProfilePanel />
 
               {lanAccess && (
                 <div style={{

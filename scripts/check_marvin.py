@@ -25,7 +25,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 368
+EXPECTED_STAGE_COUNT = 370
 
 
 @dataclass(frozen=True)
@@ -736,6 +736,8 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Transport SSH partagé", (python, "scripts/test_ssh_transport.py")),
         Stage("Registre portable des actifs infrastructure", (python, "scripts/test_infrastructure_asset_registry.py")),
         Stage("Rollback du registre des actifs", (python, "scripts/test_infrastructure_asset_registry_rollback.py")),
+        Stage("Profils SNMPv3 protégés", (python, "scripts/test_snmpv3_profiles.py")),
+        Stage("Rollback des profils SNMPv3", (python, "scripts/test_snmpv3_profiles_rollback.py")),
         Stage("Domaine d'outils SSH", (python, "scripts/test_tool_domain_ssh.py")),
         Stage("Frontière unique du routeur SSH", (python, "scripts/test_ssh_router_boundary.py")),
         Stage("Frontière des comptes e-mail", (python, "scripts/test_email_accounts_boundary.py")),

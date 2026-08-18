@@ -6,7 +6,7 @@ Lancement :
 Ne pas utiliser ``--reload`` : il interrompt les flux SSE pendant les changements.
 L'historique détaillé des versions est conservé dans ``DEVELOPMENT-JOURNAL.md`` et Git.
 """
-# v2.684 — registre portable d'actifs réseau et serveurs sans secrets
+# v2.685 — supervision SNMPv3 DPAPI et découverte LLDP/CDP en lecture seule
 # v2.584 — sauvegarde portable chiffrée, inventaire réel fermé et restauration isolée
 # v2.582 — ACL data limitées à Chawb, SYSTEM et Administrateurs avec rollback exact
 # v2.581 — maintenance SQLite offline, sauvegardée, compensable et vérifiée réellement
@@ -110,6 +110,7 @@ from api.runtime_config import router as runtime_config_router
 from api.settings import router as settings_router
 from api.skills import router as skills_router
 from api.ssh import router as ssh_router
+from api.snmp import router as snmp_router
 from api.storage import router as storage_router
 from api.system_tools import router as system_tools_router
 from api.tasks import router as tasks_router
@@ -149,7 +150,6 @@ for _stream in (sys.stdout, sys.stderr):
         _stream.reconfigure(errors="replace")
     except (AttributeError, OSError):
         pass
-
 
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
@@ -244,7 +244,6 @@ async def lifespan(app_instance: FastAPI):
         await shutdown_runtime.run("web-http", web_runtime.close)
         await shutdown_runtime.run("qdrant", vector_store.close_runtime)
 
-
 app = FastAPI(
     title="Marvin — Assistance Informatique",
     version=APP_VERSION,
@@ -315,6 +314,7 @@ app.include_router(email_preferences_router)
 app.include_router(email_automation_router)
 app.include_router(cron_monitor_router)
 app.include_router(ssh_router)
+app.include_router(snmp_router)
 app.include_router(storage_router)
 app.include_router(health_router)
 app.include_router(agent_gateway_router)

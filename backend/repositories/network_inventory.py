@@ -72,6 +72,7 @@ class NetworkInventoryRepository:
             "management_protocols": "TEXT NOT NULL DEFAULT '[]'",
             "tags": "TEXT NOT NULL DEFAULT '[]'",
             "ssh_connection_id": "TEXT NOT NULL DEFAULT ''",
+            "snmp_profile_id": "TEXT NOT NULL DEFAULT ''",
             "enabled": "INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1))",
             "source": "TEXT NOT NULL DEFAULT 'discovery'",
             "updated_at": "TEXT NOT NULL DEFAULT ''",
@@ -209,7 +210,7 @@ class NetworkInventoryRepository:
         if notes is not None:
             assignments.append("notes = ?")
             values.append(self._text(notes, "notes"))
-        scalar_fields = {"vendor", "model", "role", "site", "ssh_connection_id", "source"}
+        scalar_fields = {"vendor", "model", "role", "site", "ssh_connection_id", "snmp_profile_id", "source"}
         for field in scalar_fields:
             if field in metadata and metadata[field] is not None:
                 if field == "ssh_connection_id" and metadata[field]:
@@ -217,6 +218,11 @@ class NetworkInventoryRepository:
                         uuid.UUID(str(metadata[field]))
                     except (ValueError, AttributeError) as exc:
                         raise ValueError("Référence de connexion SSH invalide.") from exc
+                if field == "snmp_profile_id" and metadata[field]:
+                    try:
+                        uuid.UUID(str(metadata[field]))
+                    except (ValueError, AttributeError) as exc:
+                        raise ValueError("Référence de profil SNMPv3 invalide.") from exc
                 assignments.append(f"{field} = ?")
                 values.append(self._text(metadata[field], field))
         if "asset_type" in metadata and metadata["asset_type"] is not None:
@@ -281,3 +287,10 @@ upsert_network_device = repository.upsert
 register_network_device = repository.register
 get_network_devices = repository.list_recent
 set_network_device_notes = repository.set_metadata
+
+
+def get_network_device(device_id: str) -> dict | None:
+    for device in repository.list_recent(_MAX_LOOKBACK_DAYS):
+        if str(device.get("id")) == str(device_id):
+            return device
+    return None
