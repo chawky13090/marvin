@@ -1,0 +1,90 @@
+{
+  "schema": "marvin.tool-selection-v18-holdout-generation-freeze/1.0",
+  "status": "frozen_before_cloud_generation_r5",
+  "source_commit": "c73c963",
+  "terminal_oracle_policy_sha256": "866fd0cd1d7b9808fd406f171b88729cf202adc0a22535dc8371c2e0d1efc597",
+  "terminal_oracle_source_sha256": "a98c4e1ac98e4fb91b0044b7c5b2ba9536966f4c2583b4567d54f25ab75c8c2e",
+  "runner_sha256": "0b79f7c7183687bab4e252076bf47acfdcfa1c825d6b3d57b07d9963ba885fbd",
+  "bounded_review_wrapper_sha256": "7c10b7ddf4095d3fcc7b71e71e0e2e8e9778767adb486d3b9b688b7003603184",
+  "r5_wrapper_sha256": "9d19b32310ea93b863307828329934677aa663bfc7cdc84d1a762aeac24925f6",
+  "author_pool_per_intent": 20,
+  "target_per_intent": 5,
+  "seeds": {
+    "author_start": 26820,
+    "oracle_a": 26850,
+    "oracle_b": 26851,
+    "adjudicator": 26860,
+    "critic": 26861
+  },
+  "thresholds_and_filters_unchanged": true,
+  "intents": [
+    "software.search",
+    "software.install",
+    "software.inventory",
+    "software.updates_check",
+    "software.upgrade",
+    "software.uninstall",
+    "software.manual_panel"
+  ],
+  "roles": {
+    "author": {"model": "nemotron-3-super:cloud", "digest": "be3943c5a818be61a08f3563b971e392bfc12e506e296fb186c870f5c63377a4"},
+    "oracle_a": {"model": "glm-5.2:cloud", "digest": "ce8fd6f94793a6786f6858717b38067feba631861e3b35e8122cb6635004cd4a"},
+    "oracle_b": {"model": "kimi-k2.7-code:cloud", "digest": "eda07a6592375dcbde7cf167b6d6b368cdd28e244f9d71559fb59919aca882fa"},
+    "adjudicator": {"model": "qwen3.5:397b-cloud", "digest": "a7bf6f7891c3c5189353c5e330f57563991f5cceabbe830c941619f24dc4dbca"},
+    "critic": {"model": "minimax-m2.7:cloud", "digest": "06daa293c105f0bd71fd19420e4d15cae66cc5f71cb8f55b4f998e96ec8ab67a"}
+  },
+  "execution_modes": {
+    "author": "cloud_model",
+    "oracle_a": "calculable_terminal_oracle_v1_no_cloud_call",
+    "oracle_b": "calculable_terminal_oracle_v1_no_cloud_call",
+    "adjudicator": "cloud_model_bounded_per_intent",
+    "critic": "cloud_model_bounded_per_intent"
+  },
+  "model_provenance_observed_at_freeze": {
+    "ollama_endpoint": "http://127.0.0.1:11434/api/tags",
+    "all_declared_role_models_present": true,
+    "cloud_roles_remote_host": "https://ollama.com:443"
+  },
+  "novelty": {
+    "token_jaccard_maximum": 0.5,
+    "compare_against_v1_2_v1_3_v1_4_and_development": true
+  },
+  "admission": {
+    "author_declared_intent_untrusted": true,
+    "two_text_reviewers_required": true,
+    "both_reviews_valid_required": true,
+    "terminal_oracle_output_required": true,
+    "unknown_or_disagreeing_item_rejected": true,
+    "all_seven_intents_require_five_survivors": true
+  },
+  "independence": {
+    "author_cannot_see_product_rules_or_results": true,
+    "reviewers_cannot_see_product_results": true,
+    "terminal_oracle_cannot_read_prompt_text": true,
+    "terminal_oracle_cannot_import_product": true,
+    "r4_prompts_and_raw_responses_unavailable": true,
+    "r4_aggregate_results_not_used_to_change_contract": true
+  },
+  "authorization": {
+    "cloud_generation_calls": true,
+    "business_tool_execution": false,
+    "host_side_effects": false,
+    "single_use": true,
+    "fifth_attempt_only": true,
+    "product_source_change": false,
+    "stage_b_model_calls": false
+  },
+  "virtualization": {
+    "docker_required": false,
+    "hyper_v_required": false,
+    "vmware_required": false
+  },
+  "privacy": {
+    "synthetic_only": true,
+    "personal_data_forbidden": true,
+    "raw_cloud_responses_persisted": false,
+    "client_num_ctx_forbidden": true,
+    "diagnostic_aggregate_only": true
+  },
+  "rollback": "Preserve this freeze and any r5 result or abort. No product, tool, setting, hypervisor or user data is changed by generation."
+}

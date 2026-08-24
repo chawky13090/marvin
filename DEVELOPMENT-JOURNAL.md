@@ -22,6 +22,10 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
   Hyper-V et VMware ne sont pas utilisés.
 - Validation : canaris positifs et négatifs pour les sept intentions, refus des intentions
   inconnues, double revue obligatoire, analyse AST des imports et plan de gate à 375 étapes.
+- Générateur r5 : auteur et deux relecteurs Cloud conservés; les deux anciens rôles oracle sont
+  remplacés par la même projection calculable et ne déclenchent aucun appel Cloud. Les revues
+  restent découpées par intention, les sept familles exigent cinq survivants et le gel à usage
+  unique précède tout appel. Le plan de gate passe à 377 étapes.
 - Rollback : réversion atomique du commit v2.688; aucune donnée persistante ni configuration
   système ne change. Le prochain appel Cloud exige un gel distinct.
 

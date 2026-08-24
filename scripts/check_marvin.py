@@ -25,7 +25,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 375
+EXPECTED_STAGE_COUNT = 377
 
 
 @dataclass(frozen=True)
@@ -314,6 +314,14 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage(
             "Oracle terminal calculable du routage v1.8",
             (python, "scripts/test_tool_selection_v18_terminal_oracle_preregistration.py"),
+        ),
+        Stage(
+            "Canaris generateur holdout logiciel v1.8 r5",
+            (python, "scripts/test_tool_selection_v18_holdout_generator_r5.py"),
+        ),
+        Stage(
+            "Gel generation holdout logiciel v1.8 r5",
+            (python, "scripts/test_tool_selection_v18_holdout_freeze_r5.py"),
         ),
         Stage(
             "Gel du générateur holdout routage v1.4",
