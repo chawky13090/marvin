@@ -37,6 +37,9 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
   et désinstallation, un oracle en accepte 0 et l'autre 20. Ollama et les cinq modèles Cloud
   étaient disponibles : ce rouge appartient à la chaîne d'oracle, pas à l'infrastructure ni au
   produit. Aucun corpus, oracle public, Stage B ou réglage du classement n'est autorisé.
+- Gate : le premier passage rapide/live a exécuté les 374 étapes et n'a trouvé qu'une version
+  obsolète dans `CLAUDE.md`; tous les tests runtime, les 28 contrats HTTP, 41 pages, cinq chats
+  et le pilotage live étaient verts. La documentation est réalignée avant le passage final.
 - Rollback : réversion atomique du commit v2.687; aucun schéma, réglage, état Hyper-V, outil ou
   contenu utilisateur n'est modifié. Après une campagne, conserver l'artefact comme preuve.
 
