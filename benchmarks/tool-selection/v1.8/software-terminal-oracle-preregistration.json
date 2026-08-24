@@ -1,0 +1,99 @@
+{
+  "schema": "marvin.software-terminal-oracle-policy/1.0",
+  "status": "frozen_before_oracle_implementation",
+  "created_after_rejected_campaign": "v1.7-r4",
+  "purpose": "Make terminal-call acceptance calculable before a new corpus exists, while keeping prompt authorship and text-intent review independent.",
+  "normative_basis": [
+    "Windows Package Manager public operation semantics: search, list, upgrade, install and uninstall are distinct operations",
+    "A terminal action must accomplish the declared intent; a preparatory action is not accepted when a terminal operation exists",
+    "Read-only intents cannot accept mutations",
+    "A Windows control-panel request is distinct from package-manager mutation"
+  ],
+  "intent_contracts": {
+    "software.search": {
+      "accepted_terminal_calls": [
+        {"tool": "winget_search", "action": null}
+      ],
+      "mutation_allowed": false
+    },
+    "software.install": {
+      "accepted_terminal_calls": [
+        {"tool": "winget_install", "action": null}
+      ],
+      "mutation_allowed": true
+    },
+    "software.inventory": {
+      "accepted_terminal_calls": [
+        {"tool": "winget_list_installed", "action": null},
+        {"tool": "pc_installed_software", "action": null}
+      ],
+      "mutation_allowed": false
+    },
+    "software.updates_check": {
+      "accepted_terminal_calls": [
+        {"tool": "winget_list_upgrades", "action": null}
+      ],
+      "mutation_allowed": false
+    },
+    "software.upgrade": {
+      "accepted_terminal_calls": [
+        {"tool": "winget_upgrade", "action": null}
+      ],
+      "mutation_allowed": true
+    },
+    "software.uninstall": {
+      "accepted_terminal_calls": [
+        {"tool": "winget_uninstall", "action": null}
+      ],
+      "mutation_allowed": true
+    },
+    "software.manual_panel": {
+      "accepted_terminal_calls": [
+        {"tool": "win_quick_launch", "action": null}
+      ],
+      "mutation_allowed": false
+    }
+  },
+  "admission_pipeline": {
+    "author_declared_intent_is_untrusted": true,
+    "two_independent_text_reviewers_required": true,
+    "reviewers_receive_prompt_and_declared_intent_but_no_product_result": true,
+    "both_reviewers_must_confirm_exact_single_intent": true,
+    "oracle_applied_only_after_both_reviews": true,
+    "partial_or_disagreeing_review": "reject_item",
+    "oracle_never_changes_declared_intent": true,
+    "unknown_intent": "reject_item"
+  },
+  "independence": {
+    "oracle_imports_product_code": false,
+    "oracle_reads_product_registry": false,
+    "oracle_reads_product_descriptions": false,
+    "oracle_reads_prior_holdout_prompts": false,
+    "oracle_reads_prior_product_scores": false,
+    "oracle_and_product_may_share_correct_public_operation_names": true,
+    "shared_source_file_or_generated_taxonomy": false
+  },
+  "anti_retrofit": {
+    "r4_prompt_text_available_to_oracle_author": false,
+    "r4_raw_responses_persisted": false,
+    "r4_aggregate_disagreement_cannot_change_intent_contracts": true,
+    "new_prompt_specific_rule_forbidden": true,
+    "threshold_change_forbidden": true
+  },
+  "future_r5": {
+    "minimum_survivors_per_intent": 5,
+    "all_seven_intents_required": true,
+    "raw_cloud_responses_persisted": false,
+    "business_tool_execution": false,
+    "host_side_effects": false,
+    "cloud_generation_authorized_by_this_artifact": false,
+    "separate_generator_freeze_required": true
+  },
+  "virtualization": {
+    "docker_required": false,
+    "hyper_v_required": false,
+    "vmware_required": false,
+    "future_mutating_replay": "VMware snapshot only"
+  },
+  "rollback": "Revert the preregistration commit before implementation. After implementation or r5, preserve this artifact as immutable evidence. No runtime or persistent state changes."
+}

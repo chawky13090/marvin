@@ -25,7 +25,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 374
+EXPECTED_STAGE_COUNT = 375
 
 
 @dataclass(frozen=True)
@@ -310,6 +310,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage(
             "Abandon holdout logiciel v1.7 r4",
             (python, "scripts/test_tool_selection_v17_holdout_abort_r4.py"),
+        ),
+        Stage(
+            "Oracle terminal calculable du routage v1.8",
+            (python, "scripts/test_tool_selection_v18_terminal_oracle_preregistration.py"),
         ),
         Stage(
             "Gel du générateur holdout routage v1.4",

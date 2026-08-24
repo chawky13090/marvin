@@ -5,6 +5,26 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-25 — v2.688.0 — oracle logiciel calculable et autonomie préservée
+
+- Cause traitée : r4 a montré que deux oracles LLM pouvaient chacun répondre sur 20 demandes
+  tout en ne partageant aucune identité d'appel. Leur vote n'est pas une base suffisamment
+  stable pour autoriser une modification du routage.
+- Décision : les sept contrats terminaux Windows Package Manager sont gelés dans un registre
+  normatif distinct et projetés par un module pur sans I/O ni import Marvin. Deux relecteurs
+  indépendants restent responsables de confirmer que le texte exprime bien l'intention déclarée;
+  un désaccord ou une réponse partielle rejette le cas.
+- Autonomie : l'oracle appartient exclusivement au benchmark. Il ne filtre ni ne commande le
+  runtime, ne retire aucun outil et ne limite pas la persévérance de Marvin. Une compensation
+  désinstaller-réinstaller reste possible après preuve exacte et confirmation propriétaire.
+- Sécurité et indépendance : aucun accès au registre produit, descriptions, résultats r4 ou
+  prompts historiques; aucun secret, contenu utilisateur, réseau ou outil métier. Docker,
+  Hyper-V et VMware ne sont pas utilisés.
+- Validation : canaris positifs et négatifs pour les sept intentions, refus des intentions
+  inconnues, double revue obligatoire, analyse AST des imports et plan de gate à 375 étapes.
+- Rollback : réversion atomique du commit v2.688; aucune donnée persistante ni configuration
+  système ne change. Le prochain appel Cloud exige un gel distinct.
+
 ## 2026-08-25 — v2.687.0 — frontière de remédiation logicielle pré-enregistrée
 
 - Demande : terminer la séparation recherche/installation/inventaire/vérification des mises à
