@@ -1,0 +1,100 @@
+{
+  "schema": "marvin.tool-selection-v17-holdout-generation-freeze/1.0",
+  "status": "frozen_before_cloud_generation_r4",
+  "source_commit": "fd2be4f",
+  "software_remediation_preregistration_sha256": "56acff79764b941cdb917ae2ea7de8129929a33f76bd677e67bc11e1df302659",
+  "supersedes_freeze_sha256": "ed60492d0341198b1c65d1c97c02c25c461ffa9948f2041aafab1e777d370383",
+  "prior_abort_sha256": "60b3c6b9d41ebd813359c182a10c3395aa2ff64d379d19a2ac4a403f04218f27",
+  "runner_sha256": "0b79f7c7183687bab4e252076bf47acfdcfa1c825d6b3d57b07d9963ba885fbd",
+  "wrapper_sha256": "7c10b7ddf4095d3fcc7b71e71e0e2e8e9778767adb486d3b9b688b7003603184",
+  "author_pool_per_intent": 20,
+  "target_per_intent": 5,
+  "seeds": {
+    "author_start": 26820,
+    "oracle_a": 26850,
+    "oracle_b": 26851,
+    "adjudicator": 26860,
+    "critic": 26861
+  },
+  "thresholds_and_filters_unchanged": true,
+  "intents": [
+    "software.search",
+    "software.install",
+    "software.inventory",
+    "software.updates_check",
+    "software.upgrade",
+    "software.uninstall",
+    "software.manual_panel"
+  ],
+  "roles": {
+    "author": {
+      "model": "nemotron-3-super:cloud",
+      "digest": "be3943c5a818be61a08f3563b971e392bfc12e506e296fb186c870f5c63377a4"
+    },
+    "oracle_a": {
+      "model": "glm-5.2:cloud",
+      "digest": "ce8fd6f94793a6786f6858717b38067feba631861e3b35e8122cb6635004cd4a"
+    },
+    "oracle_b": {
+      "model": "kimi-k2.7-code:cloud",
+      "digest": "eda07a6592375dcbde7cf167b6d6b368cdd28e244f9d71559fb59919aca882fa"
+    },
+    "adjudicator": {
+      "model": "qwen3.5:397b-cloud",
+      "digest": "a7bf6f7891c3c5189353c5e330f57563991f5cceabbe830c941619f24dc4dbca"
+    },
+    "critic": {
+      "model": "minimax-m2.7:cloud",
+      "digest": "06daa293c105f0bd71fd19420e4d15cae66cc5f71cb8f55b4f998e96ec8ab67a"
+    }
+  },
+  "model_provenance_observed_at_freeze": {
+    "ollama_endpoint": "http://127.0.0.1:11434/api/tags",
+    "all_roles_remote_host": "https://ollama.com:443",
+    "all_required_models_present": true
+  },
+  "novelty": {
+    "token_jaccard_maximum": 0.5,
+    "compare_against_v1_2_v1_3_v1_4_and_development": true
+  },
+  "only_authorized_generator_change": {
+    "adjudicator_review_batching": "one_request_per_intent",
+    "critic_review_batching": "one_request_per_intent",
+    "exact_item_id_coverage_per_batch_required": true,
+    "partial_batch_fails_closed": true,
+    "author_prompt_unchanged": true,
+    "oracle_prompts_unchanged": true,
+    "review_prompt_semantics_unchanged": true,
+    "novelty_semantics_unchanged": true,
+    "selection_thresholds_unchanged": true
+  },
+  "independence": {
+    "roles_cannot_see_product_rules_or_prior_results": true,
+    "cross_role_model_family_reuse_forbidden": true,
+    "oracle_consensus_required": true,
+    "two_independent_reviews_required": true,
+    "prior_failures_not_used_to_change_thresholds_or_contracts": true
+  },
+  "authorization": {
+    "cloud_generation_calls": true,
+    "benchmark_model_calls": false,
+    "business_tool_execution": false,
+    "host_side_effects": false,
+    "single_use": true,
+    "fourth_attempt_only": true,
+    "product_source_change": false
+  },
+  "virtualization": {
+    "hyper_v_required": false,
+    "docker_required": false,
+    "vmware_required": false
+  },
+  "privacy": {
+    "synthetic_only": true,
+    "personal_data_forbidden": true,
+    "raw_cloud_responses_persisted": false,
+    "client_num_ctx_forbidden": true,
+    "diagnostic_aggregate_only": true
+  },
+  "rollback": "If r4 aborts, preserve this freeze and the aggregate abort evidence. No product source, business tool, host state, Docker, Hyper-V, VMware or user data is changed."
+}

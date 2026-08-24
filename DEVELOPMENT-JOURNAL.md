@@ -28,6 +28,10 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
   incomplète produit un refus d'escalade et un diagnostic, jamais une autorisation implicite.
 - Validation : test du pré-enregistrement, empreintes des sources gelées, catalogue à 364,
   budgets inchangés et `git diff --check` verts. Le runtime produit reste verrouillé.
+- Holdout r4 : le générateur historique et ses seuils restent inchangés. Un wrapper gelé
+  découpe seulement les revues adjudicateur/critique en sept lots bornés, exige tous les ID de
+  chaque lot et échoue fermé sur une réponse partielle. Le gel autorise une seule campagne
+  Cloud; Docker, Hyper-V, VMware et les outils métier ne sont pas requis ni appelés.
 - Rollback : réversion atomique du commit v2.687; aucun schéma, réglage, état Hyper-V, outil ou
   contenu utilisateur n'est modifié. Après une campagne, conserver l'artefact comme preuve.
 
