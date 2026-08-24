@@ -32,6 +32,11 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
   découpe seulement les revues adjudicateur/critique en sept lots bornés, exige tous les ID de
   chaque lot et échoue fermé sur une réponse partielle. Le gel autorise une seule campagne
   Cloud; Docker, Hyper-V, VMware et les outils métier ne sont pas requis ni appelés.
+- Résultat r4 : campagne consommée et refusée. Les deux oracles ont chacun produit 20 appels
+  non vides pour `software.search`, mais zéro identité normalisée commune; pour mise à niveau
+  et désinstallation, un oracle en accepte 0 et l'autre 20. Ollama et les cinq modèles Cloud
+  étaient disponibles : ce rouge appartient à la chaîne d'oracle, pas à l'infrastructure ni au
+  produit. Aucun corpus, oracle public, Stage B ou réglage du classement n'est autorisé.
 - Rollback : réversion atomique du commit v2.687; aucun schéma, réglage, état Hyper-V, outil ou
   contenu utilisateur n'est modifié. Après une campagne, conserver l'artefact comme preuve.
 

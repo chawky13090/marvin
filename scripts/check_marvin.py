@@ -308,6 +308,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             (python, "scripts/test_tool_selection_v17_holdout_freeze_r4.py"),
         ),
         Stage(
+            "Abandon holdout logiciel v1.7 r4",
+            (python, "scripts/test_tool_selection_v17_holdout_abort_r4.py"),
+        ),
+        Stage(
             "Gel du générateur holdout routage v1.4",
             (python, "scripts/test_tool_selection_v14_holdout_generation_freeze.py"),
         ),

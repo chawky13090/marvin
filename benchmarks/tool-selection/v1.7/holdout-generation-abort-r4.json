@@ -1,0 +1,72 @@
+{
+  "schema": "marvin.tool-selection-v17-generation-abort/1.0",
+  "status": "aborted_without_public_holdout",
+  "freeze": "benchmarks/tool-selection/v1.7/holdout-generation-freeze-r4.json",
+  "freeze_sha256": "94a0493a374a60fecf454c143542b6471e6bebee5521be43ea6d566f6441ed87",
+  "runner_sha256": "7c10b7ddf4095d3fcc7b71e71e0e2e8e9778767adb486d3b9b688b7003603184",
+  "diagnostic": "benchmarks/tool-selection/v1.7/holdout-generation-diagnostics-r4.json",
+  "diagnostic_sha256": "2a7b9c4d980c09c9cd464bd48f84a2e1967e678c32028af7e962bfe3d01e4bd4",
+  "reason_code": "cross_oracle_call_disagreement_and_review_rejection",
+  "failure_stage": "selection",
+  "failure_intent": "software.search",
+  "completed_stages": [
+    "author",
+    "oracle_a",
+    "oracle_b",
+    "consensus",
+    "adjudicator",
+    "critic",
+    "combined_reviews",
+    "novelty",
+    "selection"
+  ],
+  "mechanical_findings": {
+    "software_search": {
+      "authored_valid": 20,
+      "oracle_a_nonempty": 20,
+      "oracle_b_nonempty": 20,
+      "consensus_nonempty": 0,
+      "interpretation": "Both oracles returned non-empty calls but no normalized call identity matched. The prompts are not authorized for product tuning."
+    },
+    "software_install": {
+      "survivors_final": 20,
+      "interpretation": "This partial success cannot be published as a holdout because the frozen contract requires five survivors in every intent."
+    },
+    "software_upgrade_and_uninstall": {
+      "oracle_a_nonempty": 0,
+      "oracle_b_nonempty": 20,
+      "interpretation": "The disagreement is in the independent oracle chain, not evidence of a product routing failure."
+    },
+    "software_manual_panel": {
+      "consensus_nonempty": 20,
+      "adjudicator_valid": 0,
+      "critic_valid": 5,
+      "interpretation": "The two frozen reviewers disagree materially; no item is promoted."
+    }
+  },
+  "ollama": {
+    "available_after_abort": true,
+    "required_model_count_observed": 5,
+    "failure_was_service_unavailability": false
+  },
+  "immutability": {
+    "threshold_changed_after_observation": false,
+    "oracle_contract_changed_after_observation": false,
+    "review_contract_changed_after_observation": false,
+    "product_modified": false,
+    "corpus_written": false,
+    "oracle_written": false,
+    "raw_cloud_responses_persisted": false
+  },
+  "execution": {
+    "authorization_consumed": true,
+    "stage_b_authorized": false,
+    "business_tool_execution_count": 0,
+    "host_side_effect_count": 0,
+    "docker_used": false,
+    "hyper_v_used": false,
+    "vmware_used": false
+  },
+  "decision": "Preserve r4. Do not rerun, lower thresholds, tune product code, or reinterpret disagreement as a product failure. A future separately preregistered method must make oracle acceptance calculable from independently frozen tool contracts before another synthetic campaign.",
+  "rollback": "No runtime rollback is required because no product, setting, schema, tool, hypervisor or user data changed. Preserve the freeze, diagnostic and abort artifact."
+}
