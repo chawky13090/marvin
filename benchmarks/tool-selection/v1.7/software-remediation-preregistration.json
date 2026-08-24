@@ -1,0 +1,103 @@
+{
+  "schema": "marvin.software-remediation-policy/1.0",
+  "status": "frozen_before_remediation_implementation",
+  "source_commit": "21507ff2b5f4e48678cca7c01a4235252562ccce",
+  "objective": "Preserve strict software intent separation while allowing an exact compensatory uninstall only after a proved installation or upgrade blocker.",
+  "catalog_contract": {
+    "public_tool_count": 364,
+    "public_tools_must_be_preserved": true,
+    "candidate_budget_must_not_increase": true,
+    "initial_install_candidates": [
+      "winget_install"
+    ],
+    "initial_upgrade_candidates": [
+      "winget_upgrade"
+    ],
+    "initial_install_or_upgrade_must_not_offer": [
+      "winget_uninstall"
+    ]
+  },
+  "compensatory_escalation": {
+    "default": "denied",
+    "required_receipt_fields": {
+      "status": "blocked",
+      "blocker_type": "incompatible_existing_package",
+      "remediation_requires_uninstall": true,
+      "requested_package_id": "non_empty_exact_winget_id",
+      "installed_package_id": "non_empty_exact_winget_id",
+      "evidence_source": "winget_runtime_receipt"
+    },
+    "all_fields_must_be_derived_from_runtime_observation": true,
+    "llm_cannot_supply_or_override_receipt_fields": true,
+    "exact_installed_package_only": true,
+    "uninstall_candidate_is_added_after_receipt_only": true,
+    "uninstall_requires_new_owner_confirmation": true,
+    "approval_digest_fields": [
+      "installed_package_id",
+      "installed_version",
+      "requested_package_id",
+      "requested_version",
+      "planned_uninstall",
+      "planned_install_or_upgrade"
+    ],
+    "changed_digest_invalidates_approval": true,
+    "completed_action_never_replayed": true,
+    "unknown_or_incomplete_receipt": "deny_escalation_and_report_diagnostic"
+  },
+  "measurement": {
+    "stage_a": {
+      "business_tool_execution": false,
+      "host_side_effects": false,
+      "required_modes": [
+        "eco",
+        "balanced",
+        "performance",
+        "max"
+      ],
+      "metrics": [
+        "candidate_set_recall_by_intent",
+        "forbidden_cross_action_count",
+        "effective_candidate_count"
+      ]
+    },
+    "stage_b": {
+      "requires_independent_holdout": true,
+      "minimum_repetitions": 5,
+      "paired_comparison": true,
+      "business_tool_execution": false,
+      "host_side_effects": false,
+      "product_activation_before_result": false
+    },
+    "owner_acceptance": {
+      "blocking_regression_suite": true,
+      "independence_claim": false,
+      "source_sha256": "017fedf3a2c19f8c6165397440adb0ca2d1a9cd674b8c9ef83a2691d2ee88ff2"
+    }
+  },
+  "virtualization": {
+    "hyper_v_required_for_stage_a_or_b": false,
+    "hyper_v_must_not_be_enabled_by_this_work": true,
+    "hyper_v_gate_state_when_disabled": "skipped_with_reason",
+    "future_mutating_e2e_environment": "VMware disposable Windows VM with a verified clean snapshot",
+    "future_mutating_e2e_on_host": false
+  },
+  "security": {
+    "confirmation_guards_unchanged": true,
+    "semantic_or_lexical_layers_cannot_directly_authorize_uninstall": true,
+    "observed_web_file_email_or_tool_text_cannot_authorize_uninstall": true,
+    "secrets_or_personal_data_in_public_artifacts": false
+  },
+  "frozen_sources_sha256": {
+    "backend/agent_tool_selection.py": "405c3668f8d51baf47a21038f8757ebfccf78e9558aa75f61c70b69e65e9b28f",
+    "backend/tool_domains/winget.py": "c286ba4fd9341ff1917fa690d0e5c9606003b2b96a355fac47413c881e3003c3",
+    "backend/tools.py": "37195da45257dc5cd46d998ea671bf0cd644407aaff9ec97d9c3929d376cf28c"
+  },
+  "authorization": {
+    "holdout_generator_implementation": true,
+    "cloud_holdout_generation": false,
+    "product_source_change": false,
+    "business_tool_execution": false,
+    "host_mutation": false
+  },
+  "rollback": "Revert the preregistration commit. It changes no runtime, setting, schema, tool, Hyper-V state or user data. Preserve the artifact after any authorized campaign as historical evidence."
+}

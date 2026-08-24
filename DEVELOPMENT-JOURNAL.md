@@ -5,6 +5,32 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-25 — v2.687.0 — frontière de remédiation logicielle pré-enregistrée
+
+- Demande : terminer la séparation recherche/installation/inventaire/vérification des mises à
+  jour/mise à niveau/désinstallation tout en préservant l'autonomie nécessaire lorsqu'une
+  installation exige réellement le retrait d'un paquet incompatible.
+- Constat : la frontière v1.5 ferme déjà la sélection initiale sur l'outil terminal exact et
+  résiste à une couche sémantique hostile. Le manque est un contrat de compensation prouvé,
+  pas un nouveau mot-clé ni un élargissement permanent des candidats.
+- Décision : une demande initiale d'installation ou de mise à niveau ne présente jamais
+  `winget_uninstall`. Une désinstallation compensatoire ne pourra apparaître qu'après un reçu
+  runtime typé, complet et non fourni par le LLM, avec identifiants Winget exacts; elle exigera
+  une nouvelle confirmation liée à l'empreinte du plan complet.
+- Mesure : Stage A/B restent sans exécution métier. Un holdout indépendant et cinq répétitions
+  appariées sont obligatoires avant activation produit. Le corpus propriétaire demeure un test
+  d'acceptation bloquant, sans prétention d'indépendance.
+- Virtualisation : Hyper-V reste désactivé et n'est ni requis ni réactivé. Les futures mutations
+  E2E seront limitées à une VM Windows VMware jetable avec snapshot propre vérifié; sur l'hôte,
+  elles restent interdites.
+- Sécurité, données et logs : aucun secret, texte utilisateur, événement ou donnée persistante
+  n'est ajouté. Les gardes de confirmation et les 364 outils restent inchangés. Une preuve
+  incomplète produit un refus d'escalade et un diagnostic, jamais une autorisation implicite.
+- Validation : test du pré-enregistrement, empreintes des sources gelées, catalogue à 364,
+  budgets inchangés et `git diff --check` verts. Le runtime produit reste verrouillé.
+- Rollback : réversion atomique du commit v2.687; aucun schéma, réglage, état Hyper-V, outil ou
+  contenu utilisateur n'est modifié. Après une campagne, conserver l'artefact comme preuve.
+
 ## 2026-08-18 — v2.686.0 — reconnexion du chat après redémarrage backend
 
 - Incident : un prompt actif a rencontré `TypeError: Failed to fetch` pendant le redémarrage

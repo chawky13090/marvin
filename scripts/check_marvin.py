@@ -296,6 +296,10 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
             (python, "scripts/test_tool_selection_v16_owner_acceptance.py"),
         ),
         Stage(
+            "Pre-enregistrement remediation logicielle v1.7",
+            (python, "scripts/test_tool_selection_v17_remediation_preregistration.py"),
+        ),
+        Stage(
             "Gel du générateur holdout routage v1.4",
             (python, "scripts/test_tool_selection_v14_holdout_generation_freeze.py"),
         ),
