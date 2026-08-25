@@ -1,0 +1,36 @@
+{
+  "schema": "marvin.tool-selection-v18-generation-abort/1.0",
+  "status": "aborted_runner_nonconformity_no_public_holdout",
+  "freeze_sha256": "aadefefa41652115b7f3ec87f83315140717b1113afe9cc1c6033e128a61a754",
+  "runner_sha256": "9d19b32310ea93b863307828329934677aa663bfc7cdc84d1a762aeac24925f6",
+  "diagnostic_sha256": "a438cd7700b7e331f2962dbfcf001097062d5695e2df11f221a86af64c4b01d6",
+  "failure_stage": "selection",
+  "failure_intent": "software.search",
+  "reason_code": "reviewer_scope_exceeded_frozen_v18_contract",
+  "mechanical_findings": {
+    "calculable_oracle": "20_of_20_consensus_nonempty_in_all_seven_intents",
+    "software_search": "adjudicator_0_critic_20",
+    "software_manual_panel": "adjudicator_0_critic_1",
+    "runner_violation": "The inherited r3 review prompt asks reviewers to judge terminal-call safety. The frozen v1.8 policy only authorizes exact text-intent and single-action review.",
+    "product_inference_authorized": false
+  },
+  "immutability": {
+    "corpus_written": false,
+    "oracle_written": false,
+    "product_modified": false,
+    "threshold_changed": false,
+    "terminal_oracle_changed": false,
+    "raw_cloud_responses_persisted": false
+  },
+  "execution": {
+    "authorization_consumed": true,
+    "stage_b_authorized": false,
+    "business_tool_execution_count": 0,
+    "host_side_effect_count": 0,
+    "docker_used": false,
+    "hyper_v_used": false,
+    "vmware_used": false
+  },
+  "next_rule": "A separately frozen r6 wrapper may only narrow reviewer input to id, prompt and declared intent and use the exact v1.8 text-intent rubric. It cannot change authoring, terminal oracle, novelty, thresholds or product code.",
+  "rollback": "No runtime rollback required. Preserve freeze, diagnostics and abort."
+}

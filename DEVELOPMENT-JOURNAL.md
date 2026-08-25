@@ -26,6 +26,10 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
   remplacés par la même projection calculable et ne déclenchent aucun appel Cloud. Les revues
   restent découpées par intention, les sept familles exigent cinq survivants et le gel à usage
   unique précède tout appel. Le plan de gate passe à 377 étapes.
+- Résultat r5 : l'oracle calculable obtient 20/20 consensus dans les sept familles. La campagne
+  reste refusée car le wrapper a hérité du prompt r3 qui demande aussi aux relecteurs de juger
+  l'appel terminal, contrairement au périmètre textuel gelé v1.8. Recherche obtient 0/20 chez
+  l'adjudicateur contre 20/20 chez le critique; aucun résultat produit n'en est déduit.
 - Rollback : réversion atomique du commit v2.688; aucune donnée persistante ni configuration
   système ne change. Le prochain appel Cloud exige un gel distinct.
 
