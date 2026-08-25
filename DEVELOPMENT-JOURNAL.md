@@ -45,6 +45,13 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
   35 cas et les quatre écritures atomiques. Le manifeste rétablit explicitement la section
   `novelty`; le gel lie le préflight et tous les runners hérités. Marvin runtime reste inchangé.
   Le plan de gate passe à 383 étapes.
+- Résultat r7 : le pipeline complet atteint la sélection, mais la désinstallation obtient 0/20
+  chez l'adjudicateur contre 20/20 chez le critique, malgré 20/20 de consensus calculable. Les
+  six autres familles ont au moins neuf survivants. La cause de la divergence n'est pas connue,
+  donc aucun résultat produit n'est déduit et aucun r8 Cloud automatique n'est autorisé. La
+  validation revient au corpus d'acceptation propriétaire et aux usages futurs étiquetés; une
+  nouvelle méthode synthétique exigerait une décision séparée. Marvin garde ses 364 outils, sa
+  liberté runtime et toutes ses gardes. Le plan de gate passe à 384 étapes.
 - Rollback : réversion atomique du commit v2.688; aucune donnée persistante ni configuration
   système ne change. Le prochain appel Cloud exige un gel distinct.
 

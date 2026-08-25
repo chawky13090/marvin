@@ -1,0 +1,52 @@
+{
+  "schema": "marvin.tool-selection-v18-generation-abort/1.2",
+  "status": "aborted_independent_review_disagreement_no_public_holdout",
+  "freeze_sha256": "2966ca609baa5629ac822611cddce119b1c7cdbed8917d4044b95675bbe70b88",
+  "runner_sha256": "5c11e1cf014116b0b34c0262b96077331bfb2fb9e1bc92e01dfc77b509acf8ba",
+  "diagnostic_sha256": "52b296f3d02b99f7a7b546b86724aa3690ca9b9c664a3e5ba73fa191368b08e0",
+  "source_commit": "3d136b7a",
+  "failure_stage": "selection",
+  "failure_intent": "software.uninstall",
+  "reason_code": "dual_text_review_zero_consensus_for_uninstall",
+  "mechanical_findings": {
+    "full_pipeline_completed": true,
+    "offline_preflight_passed_before_cloud": true,
+    "calculable_oracle_consensus_all_intents": "20_of_20",
+    "software_uninstall": "adjudicator_0_critic_20_both_0_survivors_0",
+    "software_manual_panel": "adjudicator_10_critic_17_both_10_survivors_9",
+    "other_five_intents_minimum_survivors": 15,
+    "reviewer_disagreement_cause_known": false,
+    "product_inference_authorized": false
+  },
+  "immutability": {
+    "corpus_written": false,
+    "oracle_written": false,
+    "report_written": false,
+    "product_modified": false,
+    "threshold_changed_after_failure": false,
+    "raw_cloud_responses_persisted": false
+  },
+  "execution": {
+    "authorization_consumed": true,
+    "stage_b_authorized": false,
+    "business_tool_execution_count": 0,
+    "host_side_effect_count": 0,
+    "docker_used": false,
+    "hyper_v_used": false,
+    "vmware_used": false
+  },
+  "campaign_stop_rule": {
+    "automatic_r8_cloud_retry_authorized": false,
+    "threshold_reduction_authorized": false,
+    "single_reviewer_acceptance_authorized": false,
+    "reuse_rejected_prompts_authorized": false,
+    "next_validation_source": "owner_acceptance_corpus_and_future_version_labeled_real_usage",
+    "rare_family_synthetic_generation": "requires_new_method_and_separate_owner_decision"
+  },
+  "runtime_autonomy": {
+    "marvin_runtime_behavior_changed": false,
+    "public_tool_count": 364,
+    "security_guards_changed": false
+  },
+  "rollback": "No runtime rollback required. Preserve freeze, diagnostics and abort."
+}

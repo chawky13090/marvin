@@ -1,0 +1,107 @@
+{
+  "schema": "marvin.tool-selection-v15-generation-diagnostics/1.0",
+  "status": "aborted",
+  "policy_sha256": "2966ca609baa5629ac822611cddce119b1c7cdbed8917d4044b95675bbe70b88",
+  "runner_sha256": "0b79f7c7183687bab4e252076bf47acfdcfa1c825d6b3d57b07d9963ba885fbd",
+  "completed_stages": [
+    "author",
+    "oracle_a",
+    "oracle_b",
+    "consensus",
+    "adjudicator",
+    "critic",
+    "combined_reviews",
+    "novelty",
+    "selection"
+  ],
+  "failure_stage": "selection",
+  "failure_intent": "software.uninstall",
+  "counts_by_intent": {
+    "software.search": {
+      "authored_valid": 20,
+      "oracle_a_nonempty": 20,
+      "oracle_b_nonempty": 20,
+      "consensus_nonempty": 20,
+      "adjudicator_valid": 20,
+      "critic_valid": 20,
+      "both_reviews_valid": 20,
+      "novelty_valid": 20,
+      "survivors_final": 20
+    },
+    "software.install": {
+      "authored_valid": 20,
+      "oracle_a_nonempty": 20,
+      "oracle_b_nonempty": 20,
+      "consensus_nonempty": 20,
+      "adjudicator_valid": 20,
+      "critic_valid": 15,
+      "both_reviews_valid": 15,
+      "novelty_valid": 20,
+      "survivors_final": 15
+    },
+    "software.inventory": {
+      "authored_valid": 20,
+      "oracle_a_nonempty": 20,
+      "oracle_b_nonempty": 20,
+      "consensus_nonempty": 20,
+      "adjudicator_valid": 20,
+      "critic_valid": 20,
+      "both_reviews_valid": 20,
+      "novelty_valid": 19,
+      "survivors_final": 19
+    },
+    "software.updates_check": {
+      "authored_valid": 20,
+      "oracle_a_nonempty": 20,
+      "oracle_b_nonempty": 20,
+      "consensus_nonempty": 20,
+      "adjudicator_valid": 20,
+      "critic_valid": 20,
+      "both_reviews_valid": 20,
+      "novelty_valid": 18,
+      "survivors_final": 18
+    },
+    "software.upgrade": {
+      "authored_valid": 20,
+      "oracle_a_nonempty": 20,
+      "oracle_b_nonempty": 20,
+      "consensus_nonempty": 20,
+      "adjudicator_valid": 20,
+      "critic_valid": 20,
+      "both_reviews_valid": 20,
+      "novelty_valid": 20,
+      "survivors_final": 20
+    },
+    "software.uninstall": {
+      "authored_valid": 20,
+      "oracle_a_nonempty": 20,
+      "oracle_b_nonempty": 20,
+      "consensus_nonempty": 20,
+      "adjudicator_valid": 0,
+      "critic_valid": 20,
+      "both_reviews_valid": 0,
+      "novelty_valid": 20,
+      "survivors_final": 0
+    },
+    "software.manual_panel": {
+      "authored_valid": 20,
+      "oracle_a_nonempty": 20,
+      "oracle_b_nonempty": 20,
+      "consensus_nonempty": 20,
+      "adjudicator_valid": 10,
+      "critic_valid": 17,
+      "both_reviews_valid": 10,
+      "novelty_valid": 19,
+      "survivors_final": 9
+    }
+  },
+  "aggregate_only": true,
+  "raw_cloud_responses_persisted": false,
+  "prompts_persisted": false,
+  "candidate_ids_persisted": false,
+  "accepted_calls_persisted": false,
+  "per_item_verdicts_persisted": false,
+  "personal_data_persisted": false,
+  "business_tool_execution_count": 0,
+  "host_side_effect_count": 0
+}
