@@ -25,7 +25,7 @@ from repository_test_scope import backend_python_files
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 VENV_PYTHON = BACKEND / ".venv" / "Scripts" / "python.exe"
-EXPECTED_STAGE_COUNT = 378
+EXPECTED_STAGE_COUNT = 380
 
 
 @dataclass(frozen=True)
@@ -326,6 +326,14 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage(
             "Abandon non conforme holdout logiciel v1.8 r5",
             (python, "scripts/test_tool_selection_v18_holdout_abort_r5.py"),
+        ),
+        Stage(
+            "Canaris revue textuelle holdout logiciel v1.8 r6",
+            (python, "scripts/test_tool_selection_v18_holdout_generator_r6.py"),
+        ),
+        Stage(
+            "Gel generation holdout logiciel v1.8 r6",
+            (python, "scripts/test_tool_selection_v18_holdout_freeze_r6.py"),
         ),
         Stage(
             "Gel du générateur holdout routage v1.4",

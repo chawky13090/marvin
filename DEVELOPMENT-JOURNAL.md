@@ -30,6 +30,11 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
   reste refusée car le wrapper a hérité du prompt r3 qui demande aussi aux relecteurs de juger
   l'appel terminal, contrairement au périmètre textuel gelé v1.8. Recherche obtient 0/20 chez
   l'adjudicateur contre 20/20 chez le critique; aucun résultat produit n'en est déduit.
+- Tentative r6 pré-enregistrée : les relecteurs Cloud ne reçoivent désormais que `id`, `intent`
+  et `prompt`. Ils jugent l'intention textuelle exacte et l'unicité de l'action, sans catalogue,
+  nom d'outil, appel terminal, résultat produit, faisabilité ni sécurité. Des canaris positifs et
+  négatifs vérifient cette frontière; Marvin, ses 364 outils, ses gardes et son autonomie runtime
+  restent inchangés. Le plan de gate passe à 380 étapes.
 - Rollback : réversion atomique du commit v2.688; aucune donnée persistante ni configuration
   système ne change. Le prochain appel Cloud exige un gel distinct.
 
