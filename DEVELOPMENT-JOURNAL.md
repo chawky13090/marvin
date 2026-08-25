@@ -5,6 +5,38 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-08-25 — v2.689.0 — désinstallation Winget vérifiée sans rejeu ambigu
+
+- Demande : vérifier en conditions réelles l'installation et la désinstallation d'un logiciel
+  tout en conservant l'intelligence et l'autonomie de Marvin. `Opera.Opera` était absent avant
+  le test, puis son installation silencieuse a réussi et sa présence a été confirmée dans
+  l'inventaire Winget.
+- Constat : `winget uninstall --silent` a retourné le code 0 tout en lançant l'assistant Opera;
+  treize processus Opera sont apparus et le paquet restait installé. Le contrôle immédiat de
+  Marvin produisait alors un échec définitif, sans distinguer une interaction en attente d'un
+  véritable échec Winget.
+- Décision : après une désinstallation, Marvin observe l'inventaire jusqu'à onze fois, toutes
+  les deux secondes. Si Winget signale un lancement réussi mais que le paquet reste présent,
+  le reçu porte `action_outcome_unknown`, `interaction_may_be_required` et
+  `retry_allowed: false`. Il invite à terminer l'assistant et à vérifier l'inventaire, sans
+  jamais relancer automatiquement une mutation dont l'issue est ambiguë.
+- Résultat réel : après confirmation propriétaire dans l'assistant officiel Opera, le paquet
+  n'est plus dans Winget et aucun processus Opera ne reste. Le profil sous AppData/Roaming a été
+  conservé. Trois fichiers d'installation résiduels totalisant 3 032 octets restent dans le
+  dossier programme et n'ont pas été supprimés, faute de nécessité et de confirmation distincte.
+- Sécurité et journalisation : identifiant de paquet exact, confirmation avant chaque mutation,
+  aucune suppression de profil, aucun secret ni contenu utilisateur ajouté aux logs. Les champs
+  structurés distinguent succès, échec ferme et résultat indéterminé; les sorties Winget restent
+  bornées dans le reçu.
+- Validation : test de domaine nominal, résultat interactif indéterminé et échec ferme; syntaxe
+  Python et différence Git sans erreur. Le gate a correctement détecté que `winget.py` était
+  une source historiquement gelée par v1.7; un erratum conserve l'ancien blob au commit exact
+  et atteste que ni routage, ni budget, ni catalogue public ne changent. Le gate d'architecture
+  et le gate rapide sont rejoués avant livraison.
+- Rollback : réversion atomique du commit v2.689 puis redémarrage du backend. Aucun schéma,
+  réglage ou contenu Marvin n'est migré. Opera installé pour le test a déjà été retiré; son
+  profil conservé et les trois résidus restent indépendants de la réversion du code.
+
 ## 2026-08-25 — v2.688.0 — oracle logiciel calculable et autonomie préservée
 
 - Cause traitée : r4 a montré que deux oracles LLM pouvaient chacun répondre sur 20 demandes

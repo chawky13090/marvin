@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.688.0, 364 outils, 400 routes.** Architecture dans
+> **État courant : v2.689.0, 364 outils, 400 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.688.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.689.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +225,20 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.688.0)
+## 9. État actuel (v2.689.0)
+
+**v2.689 (désinstallation Winget vérifiée)** : un cycle réel avec `Opera.Opera` a confirmé
+qu'un désinstalleur interactif peut laisser Winget retourner le code 0 avant que le paquet ait
+disparu. Marvin attend désormais une convergence bornée de l'inventaire pendant au plus onze
+observations espacées de deux secondes. Si le paquet reste présent après un lancement Winget
+réussi, le reçu indique un résultat indéterminé et une interaction potentiellement requise,
+interdit le rejeu automatique et demande une vérification après la fermeture de l'assistant.
+Les échecs Winget fermes restent rejouables après diagnostic. Le test réel a installé puis
+retiré Opera avec confirmation propriétaire; le profil utilisateur a été conservé et trois
+petits fichiers d'installation résiduels n'ont pas été supprimés. L'empreinte Winget gelée par
+le pré-enregistrement v1.7 reste vérifiée sur son blob Git historique via un erratum; ni le
+routage ni ses candidats ne sont modifiés. Rollback : réversion atomique
+de v2.689; aucune migration ni réécriture de donnée Marvin.
 
 **v2.688 (oracle de benchmark calculable)** : l'acceptation des appels terminaux pour les sept
 intentions logicielles est gelée dans un oracle pur, sans import du produit, lecture du registre,

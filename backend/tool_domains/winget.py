@@ -181,6 +181,26 @@ async def _installed_exact(package_id: str) -> dict | None:
     )
 
 
+async def _wait_for_inventory_state(
+    package_id: str,
+    *,
+    expected_present: bool,
+    attempts: int = 11,
+    delay_seconds: float = 2.0,
+) -> tuple[dict | None, bool, int]:
+    """Attend une convergence bornée de l'inventaire après une mutation Winget."""
+    if attempts < 1 or delay_seconds < 0:
+        raise ValueError("Paramètres d'attente Winget invalides.")
+    observed: dict | None = None
+    for attempt in range(1, attempts + 1):
+        observed = await _installed_exact(package_id)
+        if (observed is not None) is expected_present:
+            return observed, True, attempt
+        if attempt < attempts:
+            await asyncio.sleep(delay_seconds)
+    return observed, False, attempts
+
+
 async def _resolve_installed_id(query: str) -> tuple[str | None, list[dict]]:
     listing = await execute_winget_list_installed({"query": query})
     apps = listing.get("apps", []) if listing.get("success") else []
@@ -342,16 +362,28 @@ async def execute_winget_uninstall(args: dict) -> dict:
         }
     selector = ["--id", resolved_id, "-e"]
     r = await asyncio.to_thread(_winget_run, ["uninstall"] + selector + ["--silent"], timeout=600)
-    remaining = await _installed_exact(resolved_id)
-    success = remaining is None
+    remaining, converged, verification_attempts = await _wait_for_inventory_state(
+        resolved_id,
+        expected_present=False,
+    )
+    success = bool(converged and remaining is None)
+    launched_but_unconfirmed = bool(r.get("ok") and not success)
     return {
         "success": success,
+        "action_outcome_unknown": launched_but_unconfirmed,
+        "interaction_may_be_required": launched_but_unconfirmed,
+        "retry_allowed": not launched_but_unconfirmed,
         "package": resolved_id,
         "code": r.get("code"),
         "changed": success,
         "verification": {
             "expected": "absent",
-            "observed": "absent" if success else "still_installed",
+            "observed": "absent" if success else (
+                "still_installed_after_bounded_wait"
+                if launched_but_unconfirmed
+                else "still_installed"
+            ),
+            "attempts": verification_attempts,
             "before": before,
             "remaining": remaining,
         },
@@ -359,7 +391,13 @@ async def execute_winget_uninstall(args: dict) -> dict:
             "Désinstallé et absence vérifiée dans l'inventaire Winget. "
             "Les données du profil utilisateur ont été conservées."
             if success
-            else "Échec : le logiciel apparaît encore dans l'inventaire Winget."
+            else (
+                "Résultat non confirmé : Winget a lancé la désinstallation, mais le logiciel "
+                "reste présent après l'attente bornée. Un désinstalleur interactif peut être "
+                "ouvert. Terminez-le puis vérifiez l'inventaire; ne relancez pas automatiquement."
+                if launched_but_unconfirmed
+                else "Échec : le logiciel apparaît encore dans l'inventaire Winget."
+            )
         ),
         "output": (
             r.get("stdout", "")[-600:]

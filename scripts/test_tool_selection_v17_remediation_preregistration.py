@@ -4,15 +4,27 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "benchmarks/tool-selection/v1.7/software-remediation-preregistration.json"
+ERRATUM = ROOT / "benchmarks/tool-selection/v1.7/software-remediation-source-erratum-v1.json"
 
 
 def _sha(relative: str) -> str:
     return hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
+
+
+def _blob_sha(commit: str, relative: str) -> str:
+    blob = subprocess.run(
+        ["git", "show", f"{commit}:{relative}"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    ).stdout
+    return hashlib.sha256(blob).hexdigest()
 
 
 def main() -> None:
@@ -51,8 +63,21 @@ def main() -> None:
     assert virtualization["future_mutating_e2e_on_host"] is False
     assert "VMware" in virtualization["future_mutating_e2e_environment"]
 
+    erratum = json.loads(ERRATUM.read_text(encoding="utf-8"))
+    assert erratum["historical_policy"] == str(POLICY.relative_to(ROOT)).replace("\\", "/")
+    assert erratum["historical_artifact_edited"] is False
+    assert erratum["routing_contract_changed"] is False
+    assert erratum["candidate_selection_changed"] is False
+    assert erratum["public_tool_count_changed"] is False
+    changed_source = erratum["changed_source"]
+    assert value["frozen_sources_sha256"][changed_source] == erratum["historical_source_sha256"]
     for path, expected in value["frozen_sources_sha256"].items():
-        assert _sha(path) == expected, path
+        observed = (
+            _blob_sha(erratum["historical_source_commit"], path)
+            if path == changed_source
+            else _sha(path)
+        )
+        assert observed == expected, path
     assert _sha("benchmarks/tool-selection/v1.6/owner-acceptance-v1.json") == (
         value["measurement"]["owner_acceptance"]["source_sha256"]
     )

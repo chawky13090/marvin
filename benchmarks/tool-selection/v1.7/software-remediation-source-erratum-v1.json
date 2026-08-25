@@ -1,0 +1,13 @@
+{
+  "schema": "marvin.tool-selection-software-remediation-source-erratum/1.0",
+  "historical_policy": "benchmarks/tool-selection/v1.7/software-remediation-preregistration.json",
+  "historical_source_commit": "fd2be4fcad0b63e36bedc5fb3d49269ff431ca04",
+  "historical_source_sha256": "c286ba4fd9341ff1917fa690d0e5c9606003b2b96a355fac47413c881e3003c3",
+  "changed_source": "backend/tool_domains/winget.py",
+  "reason": "The v1.7 policy froze the exact Winget source blob before the routing experiment. A later product correction for interactive uninstall outcome verification must preserve that historical proof without preventing unrelated, tested product maintenance.",
+  "product_change": "bounded_inventory_convergence_and_typed_unknown_outcome_after_interactive_uninstall_launch",
+  "routing_contract_changed": false,
+  "candidate_selection_changed": false,
+  "public_tool_count_changed": false,
+  "historical_artifact_edited": false
+}

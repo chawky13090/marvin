@@ -19,6 +19,7 @@ from tool_domains import winget
 async def _run() -> None:
     original_run = winget._winget_run
     original_installed_exact = winget._installed_exact
+    original_wait_for_inventory_state = winget._wait_for_inventory_state
     calls: list[list[str]] = []
     try:
         def fake_run(args: list[str], timeout: int = 90) -> dict:
@@ -92,6 +93,37 @@ async def _run() -> None:
         assert removed["success"] is True and removed["changed"] is True
         assert removed["verification"]["observed"] == "absent"
         assert calls[-1][:4] == ["uninstall", "--id", "Git.Git", "-e"]
+
+        async def still_present(_package_id: str):
+            return {"name": "Opera", "id": "Opera.Opera", "version": "1"}
+
+        async def pending_inventory(_package_id: str, **_kwargs):
+            return await still_present(_package_id), False, 11
+
+        winget._installed_exact = still_present
+        winget._wait_for_inventory_state = pending_inventory
+        pending = await winget.execute_winget_uninstall(
+            {"id": "Opera.Opera", "confirmed": True}
+        )
+        assert pending["success"] is False
+        assert pending["action_outcome_unknown"] is True
+        assert pending["interaction_may_be_required"] is True
+        assert pending["retry_allowed"] is False
+        assert pending["verification"]["observed"] == "still_installed_after_bounded_wait"
+        assert pending["verification"]["attempts"] == 11
+        assert "ne relancez pas automatiquement" in pending["message"]
+
+        def failed_run(args: list[str], timeout: int = 90) -> dict:
+            calls.append(args)
+            return {"ok": False, "code": 1603, "stdout": "", "stderr": "failure"}
+
+        winget._winget_run = failed_run
+        failed = await winget.execute_winget_uninstall(
+            {"id": "Opera.Opera", "confirmed": True}
+        )
+        assert failed["success"] is False
+        assert failed["action_outcome_unknown"] is False
+        assert failed["retry_allowed"] is True
         assert "Identifiant Winget invalide" in (
             await winget.execute_winget_upgrade({"id": "--all"})
         )["error"]
@@ -112,6 +144,7 @@ async def _run() -> None:
     finally:
         winget._winget_run = original_run
         winget._installed_exact = original_installed_exact
+        winget._wait_for_inventory_state = original_wait_for_inventory_state
 
 
 if __name__ == "__main__":
