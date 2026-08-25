@@ -40,6 +40,11 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
   Cloud ne sont pas réutilisées. Une prochaine tentative est interdite tant qu'un préflight
   entièrement hors ligne n'a pas parcouru le chemin complet jusqu'à la sélection. Le plan de
   gate passe à 381 étapes.
+- Tentative r7 pré-enregistrée : avant tout Cloud, un préflight local simule les cinq rôles et
+  traverse les sept intentions, l'oracle, les revues textuelles, la nouveauté, la sélection des
+  35 cas et les quatre écritures atomiques. Le manifeste rétablit explicitement la section
+  `novelty`; le gel lie le préflight et tous les runners hérités. Marvin runtime reste inchangé.
+  Le plan de gate passe à 383 étapes.
 - Rollback : réversion atomique du commit v2.688; aucune donnée persistante ni configuration
   système ne change. Le prochain appel Cloud exige un gel distinct.
 
