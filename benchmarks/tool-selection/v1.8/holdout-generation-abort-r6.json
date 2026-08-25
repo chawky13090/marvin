@@ -1,0 +1,35 @@
+{
+  "schema": "marvin.tool-selection-v18-generation-abort/1.1",
+  "status": "aborted_manifest_contract_error_no_public_holdout",
+  "freeze_sha256": "834311c8e4bf6faa730853ab29a561f8a54510ed6e23c46ba89bee46ffd4cf89",
+  "runner_sha256": "bf98f20f6962fdf7037cfb14fddd6b0a3f09bca51f17587039320e274b122b9c",
+  "source_commit": "960c6ccd",
+  "failure_stage": "pre_selection_policy_read",
+  "reason_code": "required_novelty_section_missing_from_frozen_manifest",
+  "mechanical_findings": {
+    "exception_type": "KeyError",
+    "missing_key": "novelty",
+    "failure_location": "generate_tool_selection_v15_holdout_r3.py:257",
+    "cloud_responses_reusable": false,
+    "product_inference_authorized": false
+  },
+  "immutability": {
+    "corpus_written": false,
+    "oracle_written": false,
+    "report_written": false,
+    "product_modified": false,
+    "threshold_changed_after_failure": false,
+    "raw_cloud_responses_persisted": false
+  },
+  "execution": {
+    "authorization_consumed": true,
+    "stage_b_authorized": false,
+    "business_tool_execution_count": 0,
+    "host_side_effect_count": 0,
+    "docker_used": false,
+    "hyper_v_used": false,
+    "vmware_used": false
+  },
+  "next_rule": "No further Cloud call is allowed until a fully offline policy-schema preflight executes the complete runner path through selection with synthetic local responses, and a separate r7 freeze pins that preflight and all required policy fields.",
+  "rollback": "No runtime rollback required. Preserve the r6 freeze and this abort."
+}

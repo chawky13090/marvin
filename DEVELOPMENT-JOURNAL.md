@@ -35,6 +35,11 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
   nom d'outil, appel terminal, résultat produit, faisabilité ni sécurité. Des canaris positifs et
   négatifs vérifient cette frontière; Marvin, ses 364 outils, ses gardes et son autonomie runtime
   restent inchangés. Le plan de gate passe à 380 étapes.
+- Résultat r6 : abandon avant sélection, car le manifeste gelé omettait la section `novelty`
+  exigée par le runner hérité. Aucun corpus, oracle ou rapport n'a été écrit et les réponses
+  Cloud ne sont pas réutilisées. Une prochaine tentative est interdite tant qu'un préflight
+  entièrement hors ligne n'a pas parcouru le chemin complet jusqu'à la sélection. Le plan de
+  gate passe à 381 étapes.
 - Rollback : réversion atomique du commit v2.688; aucune donnée persistante ni configuration
   système ne change. Le prochain appel Cloud exige un gel distinct.
 
