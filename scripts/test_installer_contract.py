@@ -109,6 +109,7 @@ def _assert_static_contract() -> None:
     assert "build-marvin-windows-package.ps1" in boutique_launcher
     assert "Security.Cryptography.SHA256" in boutique_launcher
     assert "Marvin-Windows-v*.zip" in boutique_launcher
+    assert "dir /b /a-d /o-d" in boutique_launcher
     assert "robocopy" not in boutique_launcher.casefold()
     assert "rmdir" not in boutique_launcher.casefold()
     assert "function Get-Sha256Hex" in package_builder

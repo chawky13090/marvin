@@ -27,6 +27,10 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
   directement SHA-256 via .NET, avec fermeture garantie du flux et du hasher, comme
   l'installateur de paquet. Cette correction évite la dépendance à l'auto-chargement du module
   Microsoft.PowerShell.Utility dans le contexte d'un double-clic.
+- Le second lancement réel a produit le bon ZIP mais a refusé sa publication, car un caret de
+  continuation entrait dans la commande PowerShell chargée de retrouver l'archive. Cette
+  résolution est désormais native à CMD (`dir /b /a-d /o-d`) et couverte par le contrat; le
+  contrôle SHA-256 reste indépendant du constructeur.
 
 ## 2026-08-25 — v2.689.0 — désinstallation Winget vérifiée sans rejeu ambigu
 

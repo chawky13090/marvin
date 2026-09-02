@@ -49,8 +49,7 @@ if not "%RESULT%"=="0" (
 echo.
 echo [2/3] Recherche du paquet produit...
 set "PACKAGE="
-for /f "usebackq delims=" %%F in (`powershell.exe -NoProfile -NonInteractive -Command ^
-    "$f=Get-ChildItem -LiteralPath '%OUTPUT%' -Filter 'Marvin-Windows-v*.zip' -File ^| Sort-Object LastWriteTimeUtc -Descending ^| Select-Object -First 1; if($f){$f.FullName}"`) do set "PACKAGE=%%F"
+for /f "delims=" %%F in ('dir /b /a-d /o-d "%OUTPUT%\Marvin-Windows-v*.zip" 2^>nul') do if not defined PACKAGE set "PACKAGE=%OUTPUT%\%%F"
 
 if not defined PACKAGE (
     echo [ERREUR] Aucun ZIP Marvin n'a ete produit dans "%OUTPUT%".
