@@ -15,6 +15,18 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
 }
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 
+function Get-Sha256Hex([string]$Path) {
+    $Stream = [System.IO.File]::OpenRead($Path)
+    $Hasher = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $Bytes = $Hasher.ComputeHash($Stream)
+        return ([System.BitConverter]::ToString($Bytes)).Replace('-', '').ToLowerInvariant()
+    } finally {
+        $Hasher.Dispose()
+        $Stream.Dispose()
+    }
+}
+
 if (-not (Get-Command git.exe -ErrorAction SilentlyContinue)) { throw 'Git est requis pour produire un paquet depuis les octets suivis.' }
 if ($DryRunRequested) {
     Write-Host "Le paquet serait construit depuis HEAD vers $OutputDirectory."
@@ -42,7 +54,7 @@ try {
         & git archive --format=zip --output=$PayloadPath $Commit
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $PayloadPath -PathType Leaf)) { throw 'git archive a echoue.' }
     }
-    $PayloadHash = (Get-FileHash -LiteralPath $PayloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $PayloadHash = Get-Sha256Hex -Path $PayloadPath
     $RequiredFiles = @(
         'INSTALLER-MARVIN.bat',
         'DESINSTALLER-MARVIN.bat',
@@ -75,7 +87,7 @@ try {
     $FinalZip = Join-Path $OutputDirectory "$PackageName.zip"
     Remove-Item -LiteralPath $FinalZip -Force -ErrorAction SilentlyContinue
     Compress-Archive -LiteralPath $PackageRoot -DestinationPath $FinalZip -CompressionLevel Optimal
-    $FinalHash = (Get-FileHash -LiteralPath $FinalZip -Algorithm SHA256).Hash.ToLowerInvariant()
+    $FinalHash = Get-Sha256Hex -Path $FinalZip
     [IO.File]::WriteAllText("$FinalZip.sha256", "$FinalHash  $([IO.Path]::GetFileName($FinalZip))`n", [Text.UTF8Encoding]::new($false))
     [ordered]@{
         success = $true

@@ -107,10 +107,12 @@ def _assert_static_contract() -> None:
     assert "personal_data_included = $false" in package_builder
     assert "payload.zip.sha256" not in package_builder
     assert "build-marvin-windows-package.ps1" in boutique_launcher
-    assert "Get-FileHash" in boutique_launcher
+    assert "Security.Cryptography.SHA256" in boutique_launcher
     assert "Marvin-Windows-v*.zip" in boutique_launcher
     assert "robocopy" not in boutique_launcher.casefold()
     assert "rmdir" not in boutique_launcher.casefold()
+    assert "function Get-Sha256Hex" in package_builder
+    assert "Get-FileHash" not in package_builder
     assert "[System.Security.Cryptography.SHA256]::Create()" in package_installer
     assert "$Hasher.Dispose()" in package_installer
     assert "$Stream.Dispose()" in package_installer

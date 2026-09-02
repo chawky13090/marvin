@@ -67,7 +67,7 @@ if not exist "%PACKAGE%.sha256" (
 
 echo [3/3] Verification SHA-256 du ZIP...
 powershell.exe -NoProfile -NonInteractive -Command ^
-    "$zip='%PACKAGE%'; $expected=((Get-Content -LiteralPath ($zip+'.sha256') -Raw).Trim() -split '\s+')[0].ToLowerInvariant(); $actual=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant(); if($expected -notmatch '^[0-9a-f]{64}$' -or $actual -ne $expected){Write-Error 'Empreinte SHA-256 invalide.'; exit 6}; $size=[math]::Round((Get-Item -LiteralPath $zip).Length/1MB,2); Write-Host ('[OK] Integrite verifiee - '+$size+' Mio - SHA-256 '+$actual)"
+    "$zip='%PACKAGE%'; $expected=((Get-Content -LiteralPath ($zip+'.sha256') -Raw).Trim() -split '\s+')[0].ToLowerInvariant(); $stream=[IO.File]::OpenRead($zip); $hasher=[Security.Cryptography.SHA256]::Create(); try{$actual=([BitConverter]::ToString($hasher.ComputeHash($stream))).Replace('-','').ToLowerInvariant()}finally{$hasher.Dispose();$stream.Dispose()}; if($expected -notmatch '^[0-9a-f]{64}$' -or $actual -ne $expected){Write-Error 'Empreinte SHA-256 invalide.'; exit 6}; $size=[math]::Round((Get-Item -LiteralPath $zip).Length/1MB,2); Write-Host ('[OK] Integrite verifiee - '+$size+' Mio - SHA-256 '+$actual)"
 set "RESULT=%ERRORLEVEL%"
 if not "%RESULT%"=="0" (
     popd

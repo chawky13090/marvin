@@ -22,6 +22,11 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
   construction réelle depuis le commit propre, comparaison SHA-256 et inspection du manifeste
   et du contenu de l'archive. Rollback : réversion atomique de v2.690; aucune donnée persistante
   ou configuration Marvin n'est modifiée.
+- Portabilité observée : le premier lancement réel du `.bat` a échoué fermé lors de la
+  résolution de `Get-FileHash`. Le constructeur et le contrôle externe utilisent désormais
+  directement SHA-256 via .NET, avec fermeture garantie du flux et du hasher, comme
+  l'installateur de paquet. Cette correction évite la dépendance à l'auto-chargement du module
+  Microsoft.PowerShell.Utility dans le contexte d'un double-clic.
 
 ## 2026-08-25 — v2.689.0 — désinstallation Winget vérifiée sans rejeu ambigu
 
