@@ -5,6 +5,24 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-09-02 — v2.690.0 — export boutique reproductible et vérifié
+
+- Demande : retravailler spécifiquement `PREPARER-PAQUET-BOUTIQUE.bat` afin d'exporter la
+  version courante de Marvin pour un autre poste Windows.
+- Constat : l'ancien lanceur copiait directement le répertoire de travail avec `robocopy`, ce
+  qui dépendait d'une liste d'exclusions fragile, puis supprimait récursivement le paquet
+  précédent. Un fichier local non prévu pouvait donc entrer dans l'export.
+- Décision : le `.bat` délègue au constructeur versionné fondé sur `git archive HEAD`, exige un
+  arbre suivi propre, produit le ZIP et son fichier `.sha256`, puis recalcule l'empreinte avant
+  d'annoncer le paquet prêt. Aucun effacement récursif ni copie du working tree n'est conservé.
+- Sécurité, données et logs : les fichiers non suivis, secrets, conversations, caches,
+  environnements et configurations locales sont exclus par construction. Le lanceur n'écrit
+  aucun secret ou contenu utilisateur; seuls chemin, taille et SHA-256 du paquet sont affichés.
+- Validation : contrat statique du lanceur, contrôles d'architecture et de documentation,
+  construction réelle depuis le commit propre, comparaison SHA-256 et inspection du manifeste
+  et du contenu de l'archive. Rollback : réversion atomique de v2.690; aucune donnée persistante
+  ou configuration Marvin n'est modifiée.
+
 ## 2026-08-25 — v2.689.0 — désinstallation Winget vérifiée sans rejeu ambigu
 
 - Demande : vérifier en conditions réelles l'installation et la désinstallation d'un logiciel

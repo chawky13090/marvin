@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.689.0, 364 outils, 400 routes.** Architecture dans
+> **État courant : v2.690.0, 364 outils, 400 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.689.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.690.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +225,16 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.689.0)
+## 9. État actuel (v2.690.0)
+
+**v2.690 (export boutique reproductible)** : `PREPARER-PAQUET-BOUTIQUE.bat` ne recopie plus
+le répertoire de travail avec `robocopy` et ne supprime plus récursivement un ancien dossier.
+Il construit le paquet depuis le commit Git courant par le constructeur Windows versionné,
+refuse un arbre suivi sale, exclut par construction les données, secrets, caches et fichiers
+non suivis, puis vérifie l'empreinte SHA-256 externe avant d'indiquer les deux fichiers à
+transférer. Docker, Hyper-V et Ollama Cloud restent optionnels sur le poste cible. Aucun secret,
+contenu utilisateur ou donnée persistante n'est lu ou journalisé par le lanceur. Rollback :
+réversion atomique de v2.690; aucun schéma, réglage ni contenu Marvin n'est modifié.
 
 **v2.689 (désinstallation Winget vérifiée)** : un cycle réel avec `Opera.Opera` a confirmé
 qu'un désinstalleur interactif peut laisser Winget retourner le code 0 avant que le paquet ait

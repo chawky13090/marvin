@@ -1,66 +1,92 @@
 @echo off
+setlocal EnableExtensions DisableDelayedExpansion
 chcp 65001 >nul
-title Marvin - Preparer un paquet propre pour un nouveau deploiement
-setlocal enabledelayedexpansion
-pushd "%~dp0"
+title Marvin - Export du paquet boutique
+pushd "%~dp0" || exit /b 1
+
+set "BUILDER=%~dp0scripts\build-marvin-windows-package.ps1"
+set "OUTPUT=%~dp0dist"
 
 echo.
-echo  ==============================================================
-echo     Marvin - Preparer un paquet PROPRE pour un nouveau serveur
-echo  ==============================================================
+echo ================================================================
+echo   MARVIN - PREPARATION DU PAQUET BOUTIQUE
+echo ================================================================
 echo.
-echo  Ce script cree une COPIE du projet, SANS vos donnees personnelles :
-echo    - data\             ^(conversations, memoire, captures d'ecran,
-echo                          sauvegardes, jeton eleve, competences apprises^)
-echo    - backend\data\     ^(cle de compte de service Google si presente^)
-echo    - backend\.venv, node_modules, .next   ^(specifiques a CETTE machine^)
-echo    - .env.local        ^(vos identifiants locaux^)
-echo    - .git              ^(historique de developpement, inutile sur le serveur^)
-echo.
-echo  Un simple copier-coller du dossier "secretary-ai" embarquerait TOUT
-echo  cela par erreur -- vos conversations et memoires personnelles se
-echo  retrouveraient sur le serveur de la boutique. Ce script evite ca.
-echo.
-pause
+echo Le paquet sera construit exclusivement depuis le commit Git courant.
+echo Les conversations, memoires, secrets, configurations locales, caches,
+echo environnements Python, node_modules et fichiers non suivis sont exclus.
 echo.
 
-set "DEST=%~dp0..\marvin-boutique-paquet"
-if exist "!DEST!" (
-    echo [1/2] Un paquet existe deja dans "!DEST!" -^> suppression avant recreation...
-    rmdir /s /q "!DEST!"
+if not exist "%BUILDER%" (
+    echo [ERREUR] Constructeur securise introuvable :
+    echo          %BUILDER%
+    popd
+    pause
+    exit /b 2
 )
-mkdir "!DEST!"
 
-echo [1/2] Copie du projet ^(sans les dossiers personnels/specifiques a cette machine^)...
-:: robocopy /XD exclut des DOSSIERS entiers ; /XF exclut des FICHIERS precis.
-:: Code de sortie robocopy < 8 = succes (meme avec des fichiers copies, ce qui
-:: est le cas normal) -- seul un code >= 8 est une vraie erreur.
-robocopy "%~dp0." "!DEST!" /E /NFL /NDL /NJH /NJS ^
-    /XD ".git" "data" "backend\data" ".venv" "node_modules" ".next" "__pycache__" ".pytest_cache" "generated_videos" "backend\generated_videos" ^
-    /XF ".env.local" "*.pyc" "*.log" "last-event.json" "streamText.txt" "test_ai.js" "_mining_ui.png"
-if !ERRORLEVEL! GEQ 8 (
-    echo   [ERREUR] La copie a echoue ^(code robocopy !ERRORLEVEL!^).
-    popd & pause & exit /b 1
+where powershell.exe >nul 2>&1
+if errorlevel 1 (
+    echo [ERREUR] Windows PowerShell est introuvable.
+    popd
+    pause
+    exit /b 3
 )
-echo   [OK] Copie propre creee dans : !DEST!
-echo.
 
-echo [2/2] Verification -- aucune donnee personnelle ne doit apparaitre ci-dessous :
-if exist "!DEST!\data" ( echo   [ATTENTION] data\ present -^> NE PAS transferer tel quel ! ) else ( echo   [OK] Aucun dossier data\ )
-if exist "!DEST!\backend\data" ( echo   [ATTENTION] backend\data\ present -^> NE PAS transferer tel quel ! ) else ( echo   [OK] Aucun backend\data\ )
-if exist "!DEST!\.env.local" ( echo   [ATTENTION] .env.local present -^> NE PAS transferer tel quel ! ) else ( echo   [OK] Aucun .env.local )
-echo.
+echo [1/3] Construction propre et reproductible...
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass ^
+    -File "%BUILDER%" -OutputDirectory "%OUTPUT%"
+set "RESULT=%ERRORLEVEL%"
+if not "%RESULT%"=="0" (
+    echo.
+    echo [ERREUR] Construction refusee ^(code %RESULT%^).
+    echo Le depot suivi doit etre propre. Aucun paquet incomplet ne doit etre transfere.
+    popd
+    pause
+    exit /b %RESULT%
+)
 
-echo  ==============================================================
-echo     PAQUET PRET
-echo  ==============================================================
 echo.
-echo   Dossier a transferer sur le nouveau serveur ^(cle USB, partage reseau^) :
-echo     !DEST!
+echo [2/3] Recherche du paquet produit...
+set "PACKAGE="
+for /f "usebackq delims=" %%F in (`powershell.exe -NoProfile -NonInteractive -Command ^
+    "$f=Get-ChildItem -LiteralPath '%OUTPUT%' -Filter 'Marvin-Windows-v*.zip' -File ^| Sort-Object LastWriteTimeUtc -Descending ^| Select-Object -First 1; if($f){$f.FullName}"`) do set "PACKAGE=%%F"
+
+if not defined PACKAGE (
+    echo [ERREUR] Aucun ZIP Marvin n'a ete produit dans "%OUTPUT%".
+    popd
+    pause
+    exit /b 4
+)
+if not exist "%PACKAGE%.sha256" (
+    echo [ERREUR] Empreinte externe absente : "%PACKAGE%.sha256"
+    popd
+    pause
+    exit /b 5
+)
+
+echo [3/3] Verification SHA-256 du ZIP...
+powershell.exe -NoProfile -NonInteractive -Command ^
+    "$zip='%PACKAGE%'; $expected=((Get-Content -LiteralPath ($zip+'.sha256') -Raw).Trim() -split '\s+')[0].ToLowerInvariant(); $actual=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant(); if($expected -notmatch '^[0-9a-f]{64}$' -or $actual -ne $expected){Write-Error 'Empreinte SHA-256 invalide.'; exit 6}; $size=[math]::Round((Get-Item -LiteralPath $zip).Length/1MB,2); Write-Host ('[OK] Integrite verifiee - '+$size+' Mio - SHA-256 '+$actual)"
+set "RESULT=%ERRORLEVEL%"
+if not "%RESULT%"=="0" (
+    popd
+    pause
+    exit /b %RESULT%
+)
+
 echo.
-echo   Sur le serveur, suivez ensuite INSTALLATION.md en partant de l'etape 1
-echo   ^(INSTALLER-NOUVEAU-PC.bat cree un data\ tout NEUF et vide automatiquement --
-echo   rien a faire de plus^).
+echo ================================================================
+echo   PAQUET BOUTIQUE PRET
+echo ================================================================
+echo.
+echo A transferer ensemble :
+echo   %PACKAGE%
+echo   %PACKAGE%.sha256
+echo.
+echo Sur le poste cible : extraire le ZIP puis double-cliquer sur
+echo INSTALLER-MARVIN.bat. Docker, Hyper-V et Ollama Cloud restent optionnels.
 echo.
 popd
 pause
+exit /b 0

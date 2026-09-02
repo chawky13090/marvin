@@ -40,6 +40,7 @@ def _assert_static_contract() -> None:
     legacy_ps = (ROOT / "install.ps1").read_text(encoding="utf-8")
     installer = (ROOT / "scripts" / "install-marvin-oneclick.ps1").read_text(encoding="utf-8")
     package_builder = (ROOT / "scripts" / "build-marvin-windows-package.ps1").read_text(encoding="utf-8")
+    boutique_launcher = (ROOT / "PREPARER-PAQUET-BOUTIQUE.bat").read_text(encoding="utf-8")
     package_installer = (ROOT / "scripts" / "install-marvin-package.ps1").read_text(encoding="utf-8")
     vm_qualification = (ROOT / "scripts" / "qualify-marvin-windows-package.ps1").read_text(encoding="utf-8")
     ollama_port_resolver = (ROOT / "scripts" / "resolve-ollama-port.ps1").read_text(encoding="utf-8")
@@ -105,6 +106,11 @@ def _assert_static_contract() -> None:
     assert "--untracked-files=no" in package_builder
     assert "personal_data_included = $false" in package_builder
     assert "payload.zip.sha256" not in package_builder
+    assert "build-marvin-windows-package.ps1" in boutique_launcher
+    assert "Get-FileHash" in boutique_launcher
+    assert "Marvin-Windows-v*.zip" in boutique_launcher
+    assert "robocopy" not in boutique_launcher.casefold()
+    assert "rmdir" not in boutique_launcher.casefold()
     assert "[System.Security.Cryptography.SHA256]::Create()" in package_installer
     assert "$Hasher.Dispose()" in package_installer
     assert "$Stream.Dispose()" in package_installer
