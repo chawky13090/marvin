@@ -26,6 +26,11 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
   fois avec une attente totale bornée. Le signataire refuse aussi tout ZIP dont la version ou
   le commit source ne correspond pas exactement au dépôt courant, afin d'interdire un
   habillage signé d'un artefact ancien.
+- Portabilité observée : depuis un lanceur `cmd.exe`, l'auto-chargement de
+  `Microsoft.PowerShell.Security` était indisponible; le fournisseur `Cert:` paraissait donc
+  vide alors que les certificats existaient. Le module système est désormais résolu par son
+  chemin Windows et chargé explicitement. Une restauration bornée depuis les PFX protégés par
+  DPAPI reste disponible si le fournisseur ne retourne temporairement pas l'identité.
 - Validation prévue : parsing PowerShell, contrat installateur, construction réelle, identité
   du signataire, passage `UnknownError -> Valid` après confiance, retrait puis restauration,
   empreintes EXE/CER et gate Marvin. Rollback applicatif : réversion atomique de v2.691.

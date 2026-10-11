@@ -7,6 +7,9 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$SecurityModule = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1'
+if (-not (Test-Path -LiteralPath $SecurityModule -PathType Leaf)) { throw 'Module de securite PowerShell Windows introuvable.' }
+Import-Module -Name $SecurityModule -Force -ErrorAction Stop
 $ProjectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $ZipPath = [IO.Path]::GetFullPath($ZipPath)
 if (-not (Test-Path -LiteralPath $ZipPath -PathType Leaf)) { throw 'ZIP Marvin source absent.' }
@@ -32,6 +35,18 @@ function Get-CertificateWithRetry([string]$Thumbprint, [int]$Attempts = 5) {
         if ($Attempt -lt $Attempts) { Start-Sleep -Milliseconds 400 }
     }
     return $null
+}
+
+function Import-PrivateCertificateBackup([string]$PfxPath, [string]$PasswordPath) {
+    if (-not (Test-Path -LiteralPath $PfxPath -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $PasswordPath -PathType Leaf)) { return $null }
+    $ProtectedPassword = Get-Content -LiteralPath $PasswordPath -Raw -Encoding UTF8
+    $SecurePassword = ConvertTo-SecureString -String $ProtectedPassword
+    return [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+        $PfxPath,
+        $SecurePassword,
+        [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
+    )
 }
 
 $VersionText = Get-Content -LiteralPath (Join-Path $ProjectRoot 'backend\app_version.py') -Raw -Encoding UTF8
@@ -67,7 +82,19 @@ if (Test-Path -LiteralPath $IdentityPath -PathType Leaf) {
     if ([string]$Identity.schema_version -eq '2') {
         $Certificate = Get-CertificateWithRetry -Thumbprint ([string]$Identity.signer_thumbprint)
         $RootCertificate = Get-CertificateWithRetry -Thumbprint ([string]$Identity.root_thumbprint)
-        if ($null -eq $Certificate -or -not $Certificate.HasPrivateKey -or $Certificate.NotAfter -le (Get-Date).AddDays(30)) { throw 'Certificat signataire Marvin absent ou proche de l expiration.' }
+        $BackupPasswordPath = Join-Path $SigningRoot 'marvin-private-signing-backup-password.dpapi'
+        if ($null -eq $Certificate) {
+            $Certificate = Import-PrivateCertificateBackup -PfxPath (Join-Path $SigningRoot 'marvin-private-signing-backup.pfx') -PasswordPath $BackupPasswordPath
+        }
+        if ($null -eq $RootCertificate) {
+            $RootCertificate = Import-PrivateCertificateBackup -PfxPath (Join-Path $SigningRoot 'marvin-private-root-backup.pfx') -PasswordPath $BackupPasswordPath
+        }
+        if ($null -eq $Certificate -or -not $Certificate.HasPrivateKey -or $Certificate.NotAfter -le (Get-Date).AddDays(30)) {
+            $Found = $null -ne $Certificate
+            $HasPrivateKey = $Found -and $Certificate.HasPrivateKey
+            $NotAfter = if ($Found) { $Certificate.NotAfter.ToUniversalTime().ToString('o') } else { 'absent' }
+            throw "Certificat signataire Marvin inutilisable (present=$Found; cle_privee=$HasPrivateKey; expiration=$NotAfter)."
+        }
         if ($null -eq $RootCertificate -or -not $RootCertificate.HasPrivateKey -or $RootCertificate.NotAfter -le (Get-Date).AddDays(90)) { throw 'Autorite privee Marvin absente ou proche de l expiration.' }
     }
 }

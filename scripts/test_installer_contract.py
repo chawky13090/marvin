@@ -125,6 +125,7 @@ def _assert_static_contract() -> None:
     assert "Marvin-Private-Root.cer" in private_builder
     assert "Set-AuthenticodeSignature" in private_builder
     assert "public_trust = $false" in private_builder
+    assert "Microsoft.PowerShell.Security.psd1" in private_builder
     assert "Get-CertificateWithRetry" in private_builder
     assert "package-manifest.json" in private_builder
     assert "Le ZIP ne provient pas du commit Git courant" in private_builder
