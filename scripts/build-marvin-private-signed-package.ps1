@@ -22,10 +22,38 @@ function Get-Sha256Hex([string]$Path) {
     finally { $Hasher.Dispose(); $Stream.Dispose() }
 }
 
+function Get-CertificateWithRetry([string]$Thumbprint, [int]$Attempts = 5) {
+    if ([string]::IsNullOrWhiteSpace($Thumbprint)) { return $null }
+    for ($Attempt = 1; $Attempt -le $Attempts; $Attempt++) {
+        $Certificate = Get-ChildItem -LiteralPath 'Cert:\CurrentUser\My' -ErrorAction SilentlyContinue |
+            Where-Object { $_.Thumbprint -eq $Thumbprint } |
+            Select-Object -First 1
+        if ($null -ne $Certificate) { return $Certificate }
+        if ($Attempt -lt $Attempts) { Start-Sleep -Milliseconds 400 }
+    }
+    return $null
+}
+
 $VersionText = Get-Content -LiteralPath (Join-Path $ProjectRoot 'backend\app_version.py') -Raw -Encoding UTF8
 $VersionMatch = [regex]::Match($VersionText, 'APP_VERSION\s*=\s*["'']([^"'']+)["'']')
 if (-not $VersionMatch.Success) { throw 'Version Marvin introuvable.' }
 $Version = $VersionMatch.Groups[1].Value
+$GitCommit = (& git -C $ProjectRoot rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $GitCommit -notmatch '^[0-9a-f]{40}$') { throw 'Commit Git courant introuvable.' }
+
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$Archive = [IO.Compression.ZipFile]::OpenRead($ZipPath)
+try {
+    $ManifestEntries = @($Archive.Entries | Where-Object { $_.FullName -match '(^|/)package-manifest\.json$' })
+    if ($ManifestEntries.Count -ne 1) { throw 'Le ZIP doit contenir un unique package-manifest.json.' }
+    $Reader = [IO.StreamReader]::new($ManifestEntries[0].Open(), [Text.Encoding]::UTF8, $true)
+    try { $PackageManifest = $Reader.ReadToEnd() | ConvertFrom-Json } finally { $Reader.Dispose() }
+} finally {
+    $Archive.Dispose()
+}
+if ([string]$PackageManifest.product_version -ne $Version) { throw 'La version du ZIP ne correspond pas a la version Marvin courante.' }
+if ([string]$PackageManifest.source_commit -ne $GitCommit) { throw 'Le ZIP ne provient pas du commit Git courant.' }
+
 $SigningRoot = Join-Path $env:LOCALAPPDATA 'Marvin\signing-private'
 New-Item -ItemType Directory -Path $SigningRoot -Force | Out-Null
 $CurrentSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
@@ -37,8 +65,8 @@ $RootCertificate = $null
 if (Test-Path -LiteralPath $IdentityPath -PathType Leaf) {
     $Identity = Get-Content -LiteralPath $IdentityPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ([string]$Identity.schema_version -eq '2') {
-        $Certificate = Get-Item -LiteralPath ("Cert:\CurrentUser\My\" + [string]$Identity.signer_thumbprint) -ErrorAction SilentlyContinue
-        $RootCertificate = Get-Item -LiteralPath ("Cert:\CurrentUser\My\" + [string]$Identity.root_thumbprint) -ErrorAction SilentlyContinue
+        $Certificate = Get-CertificateWithRetry -Thumbprint ([string]$Identity.signer_thumbprint)
+        $RootCertificate = Get-CertificateWithRetry -Thumbprint ([string]$Identity.root_thumbprint)
         if ($null -eq $Certificate -or -not $Certificate.HasPrivateKey -or $Certificate.NotAfter -le (Get-Date).AddDays(30)) { throw 'Certificat signataire Marvin absent ou proche de l expiration.' }
         if ($null -eq $RootCertificate -or -not $RootCertificate.HasPrivateKey -or $RootCertificate.NotAfter -le (Get-Date).AddDays(90)) { throw 'Autorite privee Marvin absente ou proche de l expiration.' }
     }

@@ -22,6 +22,10 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 - Sécurité et logs : aucun mot de passe ou clé privée n'est écrit dans Git, le paquet ou les
   logs. L'EXE signé relit le hash du ZIP embarqué avant extraction. La limite `public_trust:
   false` est publiée et interdit de confondre ce mécanisme avec SmartScreen ou le Store.
+- Robustesse : la résolution du certificat dans le magasin Windows est rejouée au plus cinq
+  fois avec une attente totale bornée. Le signataire refuse aussi tout ZIP dont la version ou
+  le commit source ne correspond pas exactement au dépôt courant, afin d'interdire un
+  habillage signé d'un artefact ancien.
 - Validation prévue : parsing PowerShell, contrat installateur, construction réelle, identité
   du signataire, passage `UnknownError -> Valid` après confiance, retrait puis restauration,
   empreintes EXE/CER et gate Marvin. Rollback applicatif : réversion atomique de v2.691.
