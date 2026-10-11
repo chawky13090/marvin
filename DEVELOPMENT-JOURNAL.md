@@ -5,6 +5,27 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-10-11 — v2.691.0 — signature privée Authenticode du paquet boutique
+
+- Demande : signer le paquet boutique sans compte Azure ni Microsoft Partner Center.
+- Alternatives : une signature publique Microsoft/Azure reste la cible de distribution large;
+  une signature auto-signée silencieusement installée serait trompeuse et dangereuse. La
+  solution retenue est une identité privée explicite, réservée aux postes contrôlés.
+- Implémentation : un EXE IExpress embarque le ZIP reproductible et son empreinte. Il est signé
+  en SHA-256 par un certificat Code Signing RSA 3072 bits. La clé privée reste dans
+  `CurrentUser\\My`; une sauvegarde PFX chiffrée et son mot de passe DPAPI restent sous
+  `%LOCALAPPDATA%\\Marvin\\signing-private` et ne sont jamais exportés avec le paquet.
+- Confiance et rollback : le certificat public est vérifié par SHA-256 puis importé, après
+  confirmation et UAC, uniquement dans `LocalMachine\\Root` et
+  `LocalMachine\\TrustedPublisher`.
+  `RETIRER-CONFIANCE-MARVIN.bat` retire exactement la même empreinte des deux magasins.
+- Sécurité et logs : aucun mot de passe ou clé privée n'est écrit dans Git, le paquet ou les
+  logs. L'EXE signé relit le hash du ZIP embarqué avant extraction. La limite `public_trust:
+  false` est publiée et interdit de confondre ce mécanisme avec SmartScreen ou le Store.
+- Validation prévue : parsing PowerShell, contrat installateur, construction réelle, identité
+  du signataire, passage `UnknownError -> Valid` après confiance, retrait puis restauration,
+  empreintes EXE/CER et gate Marvin. Rollback applicatif : réversion atomique de v2.691.
+
 ## 2026-09-02 — v2.690.0 — export boutique reproductible et vérifié
 
 - Demande : retravailler spécifiquement `PREPARER-PAQUET-BOUTIQUE.bat` afin d'exporter la

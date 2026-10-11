@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.690.0, 364 outils, 400 routes.** Architecture dans
+> **État courant : v2.691.0, 364 outils, 400 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -44,7 +44,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.690.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.691.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +225,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.690.0)
+## 9. État actuel (v2.691.0)
+
+**v2.691 (signature privée du paquet boutique)** : l'export boutique produit en plus du ZIP un
+installateur EXE IExpress signé en SHA-256 par une identité Authenticode privée Marvin. La clé
+reste dans le magasin personnel du poste de construction et possède une sauvegarde PFX chiffrée
+dont le secret est protégé par DPAPI. Le poste cible reçoit uniquement le certificat public,
+son empreinte, un import explicite avec UAC limité à `LocalMachine\\Root` et
+`LocalMachine\\TrustedPublisher`, ainsi
+qu'un retrait symétrique. Le lanceur embarqué revérifie le SHA-256 du ZIP avant extraction.
+Cette signature est adaptée aux postes contrôlés par le propriétaire mais n'est pas une chaîne
+publique Microsoft et ne doit jamais être présentée comme telle. Rollback : exécuter
+`RETIRER-CONFIANCE-MARVIN.bat`, supprimer le certificat de signature du magasin personnel si
+souhaité, puis réverter v2.691; aucune donnée Marvin n'est migrée.
 
 **v2.690 (export boutique reproductible)** : `PREPARER-PAQUET-BOUTIQUE.bat` ne recopie plus
 le répertoire de travail avec `robocopy` et ne supprime plus récursivement un ancien dossier.

@@ -41,6 +41,9 @@ def _assert_static_contract() -> None:
     installer = (ROOT / "scripts" / "install-marvin-oneclick.ps1").read_text(encoding="utf-8")
     package_builder = (ROOT / "scripts" / "build-marvin-windows-package.ps1").read_text(encoding="utf-8")
     boutique_launcher = (ROOT / "PREPARER-PAQUET-BOUTIQUE.bat").read_text(encoding="utf-8")
+    private_builder = (ROOT / "scripts" / "build-marvin-private-signed-package.ps1").read_text(encoding="utf-8")
+    private_trust = (ROOT / "scripts" / "trust-marvin-private-publisher.ps1").read_text(encoding="utf-8")
+    private_launcher = (ROOT / "scripts" / "launch-marvin-private-package.ps1").read_text(encoding="utf-8")
     package_installer = (ROOT / "scripts" / "install-marvin-package.ps1").read_text(encoding="utf-8")
     vm_qualification = (ROOT / "scripts" / "qualify-marvin-windows-package.ps1").read_text(encoding="utf-8")
     ollama_port_resolver = (ROOT / "scripts" / "resolve-ollama-port.ps1").read_text(encoding="utf-8")
@@ -110,10 +113,29 @@ def _assert_static_contract() -> None:
     assert "Security.Cryptography.SHA256" in boutique_launcher
     assert "Marvin-Windows-v*.zip" in boutique_launcher
     assert "dir /b /a-d /o-d" in boutique_launcher
+    assert "build-marvin-private-signed-package.ps1" in boutique_launcher
+    assert "Get-AuthenticodeSignature" in boutique_launcher
     assert "robocopy" not in boutique_launcher.casefold()
     assert "rmdir" not in boutique_launcher.casefold()
     assert "function Get-Sha256Hex" in package_builder
     assert "Get-FileHash" not in package_builder
+    assert "New-SelfSignedCertificate" in private_builder
+    assert "KeyUsage CertSign,CRLSign,DigitalSignature" in private_builder
+    assert "-Signer $RootCertificate" in private_builder
+    assert "Marvin-Private-Root.cer" in private_builder
+    assert "Set-AuthenticodeSignature" in private_builder
+    assert "public_trust = $false" in private_builder
+    assert "ConvertFrom-SecureString" in private_builder
+    assert "'/inheritance:r'" in private_builder
+    assert "S-1-5-18" in private_builder
+    assert "S-1-5-32-544" in private_builder
+    assert "LocalMachine" in private_trust
+    assert "-Verb RunAs" in private_trust
+    assert "TrustedPublisher" in private_trust
+    assert "SupportsShouldProcess" in private_trust
+    assert "-Remove" in private_builder
+    assert "Get-Sha256Hex" in private_launcher
+    assert "Expand-Archive" in private_launcher
     assert "[System.Security.Cryptography.SHA256]::Create()" in package_installer
     assert "$Hasher.Dispose()" in package_installer
     assert "$Stream.Dispose()" in package_installer
