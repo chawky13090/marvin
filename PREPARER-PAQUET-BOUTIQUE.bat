@@ -103,7 +103,7 @@ if not defined SIGNED_PACKAGE (
 )
 echo [5/5] Relecture de la signature et de l'editeur...
 powershell.exe -NoProfile -NonInteractive -Command ^
-    "$s=Get-AuthenticodeSignature -LiteralPath '%SIGNED_PACKAGE%'; if($null -eq $s.SignerCertificate -or $s.SignerCertificate.Subject -notlike '*CN=Marvin Private Publisher*'){Write-Error 'Signataire Marvin invalide.';exit 9}; Write-Host ('[OK] Signature presente - '+$s.SignerCertificate.Subject+' - statut local '+$s.Status)"
+    "Import-Module -Name '%SystemRoot%\System32\WindowsPowerShell\v1.0\Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1' -Force -ErrorAction Stop; $s=Get-AuthenticodeSignature -LiteralPath '%SIGNED_PACKAGE%'; if($null -eq $s.SignerCertificate -or $s.SignerCertificate.Subject -notlike '*CN=Marvin Private Publisher*'){Write-Error 'Signataire Marvin invalide.';exit 9}; Write-Host ('[OK] Signature presente - '+$s.SignerCertificate.Subject+' - statut local '+$s.Status)"
 if errorlevel 1 (
     popd
     pause

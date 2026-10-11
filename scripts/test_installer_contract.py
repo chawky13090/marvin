@@ -114,6 +114,7 @@ def _assert_static_contract() -> None:
     assert "Marvin-Windows-v*.zip" in boutique_launcher
     assert "dir /b /a-d /o-d" in boutique_launcher
     assert "build-marvin-private-signed-package.ps1" in boutique_launcher
+    assert "Microsoft.PowerShell.Security.psd1" in boutique_launcher
     assert "Get-AuthenticodeSignature" in boutique_launcher
     assert "robocopy" not in boutique_launcher.casefold()
     assert "rmdir" not in boutique_launcher.casefold()
