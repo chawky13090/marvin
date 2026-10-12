@@ -66,7 +66,7 @@ def _assert_static_contract() -> None:
     assert components["schema_version"] == 1
     assert components["minimum_windows_build"] >= 17763
     assert components["minimum_free_bytes"] >= 40 * 1024**3
-    for name in ("python", "node", "ollama"):
+    for name in ("python", "node", "ollama", "docker_desktop"):
         component = components[name]
         assert component["version"] and "latest" not in component["url"].casefold()
         assert component["url"].startswith("https://")
@@ -103,7 +103,14 @@ def _assert_static_contract() -> None:
     assert "Join-Path $DownloadRoot 'npm-cache'" in installer
     assert installer.count("$ErrorActionPreference = 'SilentlyContinue'") >= 3
     assert "AppendAllText" in installer and "UTF8Encoding]::new($false)" in installer
-    assert "Docker absent; SearXNG reste indisponible" in installer
+    assert "docker_and_searxng_required" in installer
+    assert "AcceptDockerDesktopLicense" in installer
+    assert "DeploymentProfile = 'Full'" in installer
+    docker_installer = (ROOT / "scripts" / "ensure-docker-desktop.ps1").read_text(encoding="utf-8")
+    assert "--accept-license" in docker_installer
+    assert "--always-run-service" in docker_installer
+    assert "Test-DockerEngine" in docker_installer
+    assert "StartupTimeoutSeconds" in docker_installer
 
     assert "git archive" in package_builder
     assert "--untracked-files=no" in package_builder

@@ -5,6 +5,24 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-10-12 — v2.692.0 — profil Windows Full avec Docker et SearXNG requis
+
+- Demande : réactiver Hyper-V et livrer une installation où toutes les fonctions Marvin,
+  Docker et SearXNG fonctionnent sur un autre poste Windows.
+- Décision : le profil `Full` devient le défaut et exige Docker/SearXNG; `Core` reste un choix
+  explicitement dégradé. WSL 2 est le backend portable par défaut, Hyper-V reste disponible.
+- Provenance : Docker Desktop 4.94.0 est épinglé par URL, SHA-256 et sujet Authenticode. La
+  licence n'est jamais acceptée silencieusement pour un autre propriétaire.
+- Sécurité et rollback : aucune donnée Docker n'est effacée, aucun reset usine n'est utilisé,
+  et la désinstallation Marvin ne retire pas ce runtime partagé. Les journaux ne contiennent
+  ni secret, ni charge utilisateur; les sondes Docker sont bornées.
+- VM : Windows 11 Pro build 26200 recréé, Secure Boot actif, compte `marvin` final standard,
+  Python 3.13.15, Node 24.20.0, Git 2.55.0, Go 1.27.0 et .NET 10.0.401 qualifiés. Le checkpoint
+  `Marvin-Clean` inclut l'exposition de virtualisation imbriquée. L'ancienne VM reste sauvegardée
+  séparément pour rollback jusqu'à la fin de la qualification du paquet.
+- Validation acquise : parsing PowerShell, contrat installateur et mode Plan. Reste avant la
+  livraison finale : test du paquet signé et du cycle Docker/SearXNG dans la VM propre.
+
 ## 2026-10-11 — v2.691.0 — signature privée Authenticode du paquet boutique
 
 - Demande : signer le paquet boutique sans compte Azure ni Microsoft Partner Center.

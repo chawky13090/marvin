@@ -208,7 +208,7 @@ $Optional = [ordered]@{
     } elseif ($DockerReady) {
         New-Capability 'degraded' 'Docker est pret mais SearXNG ne repond pas encore.' 'Relancer start.bat ou INSTALLER-SEARXNG.bat.'
     } else {
-        New-Capability 'unavailable' 'SearXNG facultatif indisponible sans Docker; les replis Web restent actifs.' 'Installer Docker Desktop puis relancer INSTALLER-SEARXNG.bat.'
+        New-Capability 'unavailable' 'SearXNG indisponible sans Docker; le profil Full est incomplet.' 'Installer Docker Desktop puis relancer INSTALLER-SEARXNG.bat, ou choisir explicitement le profil Core degrade.'
     }
     hyperv = if ($HyperVModule) { New-Capability 'available' ('Module Hyper-V présent; état fonctionnalité : ' + $HyperVFeature) } elseif ($HyperVFeature -eq 'Disabled') {
         New-Capability 'unavailable' 'Hyper-V désactivé.' 'Activer uniquement sur une édition Windows compatible; redémarrage requis.'

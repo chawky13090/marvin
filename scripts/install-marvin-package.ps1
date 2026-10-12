@@ -3,7 +3,10 @@ param(
     [string]$InstallRoot = '',
     [switch]$NoStart,
     [switch]$SkipModels,
-    [switch]$SkipOptional
+    [switch]$SkipOptional,
+    [ValidateSet('Full', 'Core')]
+    [string]$DeploymentProfile = 'Full',
+    [switch]$AcceptDockerDesktopLicense
 )
 
 Set-StrictMode -Version Latest
@@ -107,6 +110,8 @@ try {
     if ($NoStart) { $Arguments += '-NoStart' }
     if ($SkipModels) { $Arguments += '-SkipModels' }
     if ($SkipOptional) { $Arguments += '-SkipOptional' }
+    $Arguments += @('-DeploymentProfile', $DeploymentProfile)
+    if ($AcceptDockerDesktopLicense) { $Arguments += '-AcceptDockerDesktopLicense' }
     $Process = Start-Process -FilePath 'powershell.exe' -ArgumentList $Arguments -WorkingDirectory $InstallRoot -Wait -PassThru
     if ($Process.ExitCode -ne 0) {
         if (Test-Path -LiteralPath $Backup) { Restore-PreviousInstall }

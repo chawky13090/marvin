@@ -4,6 +4,9 @@ param(
     [switch]$NoStart,
     [switch]$SkipModels,
     [switch]$SkipOptional,
+    [ValidateSet('Full', 'Core')]
+    [string]$DeploymentProfile = 'Full',
+    [switch]$AcceptDockerDesktopLicense,
     [switch]$TestLogging
 )
 
@@ -92,6 +95,7 @@ function Save-State {
         schema_version = 1
         install_id = $InstallId
         installer_version = '1.0'
+        deployment_profile = $DeploymentProfile
         project_root = $ProjectRoot
         status = $Status
         current_stage = $CurrentStage
@@ -475,6 +479,36 @@ try {
         }
     }
 
+    if ($DeploymentProfile -eq 'Full') {
+        Invoke-InstallStage -Name 'docker_and_searxng_required' -Action {
+            $DockerCli = Get-Command docker.exe -ErrorAction SilentlyContinue
+            $DockerReady = $false
+            if ($DockerCli) {
+                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'ensure-docker-desktop.ps1')
+                $DockerReady = $LASTEXITCODE -eq 0
+            }
+            if (-not $DockerReady) {
+                $DockerComponent = $Components.docker_desktop
+                $Answer = ''
+                $DockerInstaller = Get-VerifiedDownload -Name "docker-desktop-$($DockerComponent.version)-amd64.exe" `
+                    -Url ([string]$DockerComponent.url) -Sha256 ([string]$DockerComponent.sha256) `
+                    -AuthenticodeSubjectContains ([string]$DockerComponent.authenticode_subject_contains)
+                if (-not $AcceptDockerDesktopLicense -and -not $Plan) {
+                    $Answer = Read-Host 'Docker Desktop est requis par le profil Full. Tapez ACCEPTER pour accepter sa licence et continuer'
+                    if ($Answer -cne 'ACCEPTER') { throw 'Licence Docker Desktop non acceptee; profil Full interrompu.' }
+                }
+                $DockerArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'ensure-docker-desktop.ps1'), '-InstallerPath', $DockerInstaller)
+                if ($AcceptDockerDesktopLicense -or $Answer -ceq 'ACCEPTER') { $DockerArguments += '-AcceptLicense' }
+                & powershell.exe @DockerArguments
+                if ($LASTEXITCODE -ne 0) { throw 'Docker Desktop requis ne peut pas etre qualifie.' }
+            }
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ProjectRoot 'docker\searxng\start-searxng.ps1')
+            if ($LASTEXITCODE -ne 0) { throw 'SearXNG requis ne peut pas etre qualifie.' }
+        }
+    } else {
+        $StageResults['docker_and_searxng_required'] = [ordered]@{ status = 'skipped'; reason = 'Profil Core explicitement choisi' }
+    }
+
     if (-not $SkipModels) {
         Invoke-InstallStage -Name 'local_models_and_context' -Optional -Action {
             $PortOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'resolve-ollama-port.ps1'))
@@ -516,16 +550,8 @@ try {
             & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'manage-libreoffice.ps1') -Action Ensure
             if ($LASTEXITCODE -ne 0) { throw 'LibreOffice indisponible; validation documentaire structurelle maintenue.' }
         }
-        Invoke-InstallStage -Name 'searxng_optional' -Optional -Action {
-            if (-not (Get-Command docker.exe -ErrorAction SilentlyContinue)) {
-                throw 'Docker absent; SearXNG reste indisponible et les replis Web restent actifs.'
-            }
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ProjectRoot 'docker\searxng\start-searxng.ps1')
-            if ($LASTEXITCODE -ne 0) { throw 'SearXNG local non qualifie; les replis Web restent actifs.' }
-        }
     } else {
         $StageResults['libreoffice_optional'] = [ordered]@{ status = 'skipped'; reason = 'SkipOptional explicite' }
-        $StageResults['searxng_optional'] = [ordered]@{ status = 'skipped'; reason = 'SkipOptional explicite' }
     }
 
     Invoke-InstallStage -Name 'production_build' -Action {

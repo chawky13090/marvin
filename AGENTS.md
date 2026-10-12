@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.691.0, 364 outils, 400 routes.** Architecture dans
+> **État courant : v2.692.0, 364 outils, 400 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -18,8 +18,10 @@ tous les Windows pris en charge, pas uniquement sur la machine de développement
 une installation en un clic avec détection automatique de l'édition, du matériel et des
 fonctionnalités disponibles, élévation limitée aux composants système nécessaires, reprise
 après redémarrage, diagnostic exploitable et désinstallation propre. Windows Sandbox,
-Hyper-V, Docker, GPU et Ollama Cloud sont des capacités optionnelles : leur absence ne doit
-jamais empêcher l'installation du socle Marvin. Chaque fonction doit annoncer clairement son
+GPU et Ollama Cloud restent optionnels. L'installeur distingue désormais deux contrats : le
+profil `Full`, sélectionné par défaut, exige Docker Desktop et SearXNG qualifiés; le profil
+`Core`, choisi explicitement, installe un socle dégradé sans les capacités qui en dépendent.
+Hyper-V n'est pas exigé lorsque WSL 2 fournit la virtualisation Linux. Chaque fonction doit annoncer clairement son
 niveau (`disponible`, `dégradé`, `indisponible`) et proposer un repli sûr quand il existe.
 Cette exigence couvre toutes les dépendances et configurations ajoutées au projet. En
 particulier, l'installeur doit détecter Docker, provisionner et épingler SearXNG, générer son
@@ -44,7 +46,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.691.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.692.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -225,7 +227,19 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.691.0)
+## 9. État actuel (v2.692.0)
+
+**v2.692 (profil Windows Full réellement complet)** : le profil d'installation par défaut
+exige Docker Desktop 4.94.0 et SearXNG au lieu de les classer comme options. Le binaire Docker
+est épinglé par URL, SHA-256 et éditeur Authenticode; sa licence doit être acceptée explicitement
+par le propriétaire. WSL 2 est le backend portable par défaut, Hyper-V reste sélectionnable,
+et le démon est attendu avec une borne avant la qualification SearXNG. Le profil `Core` reste
+disponible comme choix dégradé explicite pour un poste sans virtualisation; il n'est jamais
+présenté comme une installation complète. Docker étant un runtime partagé, un rollback Marvin
+ne supprime ni images, ni volumes, ni Docker Desktop. La VM Windows 11 Pro de référence a été
+recréée et qualifiée avec Secure Boot, compte final non administrateur et virtualisation
+imbriquée avant le test du paquet. Rollback : réversion atomique de v2.692 pour Marvin; la
+désinstallation éventuelle de Docker reste une décision séparée du propriétaire.
 
 **v2.691 (signature privée du paquet boutique)** : l'export boutique produit en plus du ZIP un
 installateur EXE IExpress signé en SHA-256 par une identité Authenticode privée Marvin. La clé
