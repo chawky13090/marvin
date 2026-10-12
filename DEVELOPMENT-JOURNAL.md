@@ -1,5 +1,24 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — qualification Full interrompue sur LibreOffice
+
+- Résultat observé du paquet v2.695 : Docker/SearXNG réussis en 21 927 ms;
+  modèles locaux dégradés avec `Aucun modele agent local qualifie`. Le résultat
+  de calibration n'est pas une preuve de modèle utilisable.
+- Blocage : `manage-libreoffice.ps1` attendait Winget avec `-Wait` sans borne.
+  La surveillance de campagne a expiré alors que cette étape était encore active.
+- Correction : installation et désinstallation LibreOffice disposent d'une borne
+  explicite de 900 secondes, configurable de 30 à 3 600 secondes. À expiration,
+  le processus et ses enfants sont arrêtés; le résultat demeure non confirmé et
+  demande une vérification d'inventaire avant toute nouvelle tentative.
+- Validation réelle : test PowerShell du chemin nominal et du processus bloqué,
+  parsing et contrat installateur réussis. Le paquet corrigé reste à reconstruire
+  et à qualifier; aucun succès global d'installation n'est déclaré.
+- Sécurité/logs : aucun secret ajouté; la garde existante et la rotation restent
+  inchangées. Une interruption ne prétend pas annuler une installation MSI déjà partie.
+- Rollback : réversion atomique du commit de correction; aucun schéma ni donnée
+  Marvin n'est modifié. La VM de qualification conserve son checkpoint de retour.
+
 Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre mainteneur. Toute
 évolution importante doit y ajouter une entrée datée avec : demande, constats réels, décisions,
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de

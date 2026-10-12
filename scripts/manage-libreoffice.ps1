@@ -2,7 +2,9 @@
 param(
     [ValidateSet('Status', 'Ensure', 'Verify', 'Uninstall')]
     [string]$Action = 'Status',
-    [string]$ResultPath = ''
+    [string]$ResultPath = '',
+    [ValidateRange(30, 3600)]
+    [int]$OperationTimeoutSeconds = 900
 )
 
 Set-StrictMode -Version Latest
@@ -64,6 +66,14 @@ function Save-Result($Value) {
     $Value
 }
 
+function Wait-LibreOfficeOperation($Process) {
+    if (-not $Process.WaitForExit($OperationTimeoutSeconds * 1000)) {
+        & taskkill.exe /PID $Process.Id /T /F 2>$null | Out-Null
+        throw "Operation LibreOffice non confirmee apres $OperationTimeoutSeconds secondes; verifier l inventaire avant une nouvelle tentative."
+    }
+    $Process.WaitForExit()
+}
+
 if ($Action -eq 'Ensure') {
     $Before = Get-LibreOfficeStatus
     if (-not $Before.verified) {
@@ -81,7 +91,8 @@ if ($Action -eq 'Ensure') {
                 '--version', [string]$Manifest.version, '--source', 'winget', '--silent',
                 '--disable-interactivity', '--accept-source-agreements', '--accept-package-agreements'
             )
-            $Process = Start-Process -FilePath $Winget.Source -ArgumentList $Arguments -Wait -PassThru -WindowStyle Hidden
+            $Process = Start-Process -FilePath $Winget.Source -ArgumentList $Arguments -PassThru -WindowStyle Hidden
+            Wait-LibreOfficeOperation $Process
             if ($Process.ExitCode -notin @(0, -1978335189)) {
                 throw "WinGet a échoué avec le code $($Process.ExitCode)."
             }
@@ -99,7 +110,8 @@ if ($Action -eq 'Uninstall') {
         $Process = Start-Process -FilePath $Winget.Source -ArgumentList @(
             'uninstall', '--id', [string]$Manifest.package_id, '--exact', '--silent',
             '--disable-interactivity', '--accept-source-agreements'
-        ) -Wait -PassThru -WindowStyle Hidden
+        ) -PassThru -WindowStyle Hidden
+        Wait-LibreOfficeOperation $Process
         if ($Process.ExitCode -ne 0) { throw "Désinstallation WinGet échouée : $($Process.ExitCode)." }
     }
 }
