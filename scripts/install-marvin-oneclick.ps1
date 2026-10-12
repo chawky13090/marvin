@@ -325,6 +325,26 @@ function Stop-MarvinIfRunning {
     if ($LASTEXITCODE -ne 0) { throw 'Marvin n a pas pu etre arrete proprement avant installation.' }
 }
 
+function Get-MinimumFreeBytesForCurrentRun {
+    $FreshMinimum = [uint64]$Components.minimum_free_bytes
+    $ResumeMinimum = [uint64]$Components.resume_minimum_free_bytes
+    $ManagedMarkers = @(
+        (Join-Path $ManagedRoot 'python\python.exe'),
+        (Join-Path $ManagedRoot 'node\node.exe'),
+        (Join-Path $ManagedRoot 'ollama\ollama.exe')
+    )
+    $InstalledManagedRuntimeCount = @($ManagedMarkers | Where-Object {
+        Test-Path -LiteralPath $_ -PathType Leaf
+    }).Count
+    if ($InstalledManagedRuntimeCount -gt 0) {
+        # Une reprise ne doit pas exiger de nouveau l'espace déjà consommé par
+        # les runtimes vérifiés. Les étapes suivantes revalident chaque
+        # composant; ce seuil ne contourne donc aucun contrôle d'intégrité.
+        return $ResumeMinimum
+    }
+    return $FreshMinimum
+}
+
 function Write-ManagedEnvironment {
     param([Parameter(Mandatory = $true)][string]$NodePath, [Parameter(Mandatory = $true)][string]$OllamaPath)
     $NodeDir = Split-Path -Parent $NodePath
@@ -385,8 +405,10 @@ try {
             throw "Build Windows $($Os.BuildNumber) non supporte; minimum $($Components.minimum_windows_build)."
         }
         $Drive = Get-PSDrive -Name ([IO.Path]::GetPathRoot($ProjectRoot).Substring(0, 1))
-        if ([uint64]$Drive.Free -lt [uint64]$Components.minimum_free_bytes) {
-            throw 'Au moins 40 Gio libres sont requis pour les runtimes, dependances, modeles et rollback.'
+        $RequiredFreeBytes = Get-MinimumFreeBytesForCurrentRun
+        if ([uint64]$Drive.Free -lt $RequiredFreeBytes) {
+            $RequiredGiB = [math]::Ceiling($RequiredFreeBytes / 1GB)
+            throw "Au moins $RequiredGiB Gio libres sont requis pour cette installation ou reprise et son rollback."
         }
         if (-not (Test-Path -LiteralPath (Join-Path $ProjectRoot 'package-lock.json'))) { throw 'package-lock.json absent.' }
         if (-not (Test-Path -LiteralPath (Join-Path $ProjectRoot 'backend\requirements.txt'))) { throw 'requirements.txt absent.' }

@@ -66,6 +66,7 @@ def _assert_static_contract() -> None:
     assert components["schema_version"] == 1
     assert components["minimum_windows_build"] >= 17763
     assert components["minimum_free_bytes"] >= 40 * 1024**3
+    assert 16 * 1024**3 <= components["resume_minimum_free_bytes"] < components["minimum_free_bytes"]
     for name in ("python", "node", "ollama", "docker_desktop"):
         component = components[name]
         assert component["version"] and "latest" not in component["url"].casefold()
@@ -91,6 +92,8 @@ def _assert_static_contract() -> None:
         "Rotate-InstallLog",
         "start-searxng.ps1",
         "Save-State",
+        "Get-MinimumFreeBytesForCurrentRun",
+        "resume_minimum_free_bytes",
         "WhatIfPreference",
     )
     for token in required_installer_tokens:

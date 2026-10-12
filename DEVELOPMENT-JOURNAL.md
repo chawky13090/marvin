@@ -5,6 +5,28 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-10-12 — v2.693.0 — reprise installateur après consommation de la réserve disque
+
+- Demande : poursuivre la qualification du paquet boutique signé sur une VM Windows vierge,
+  avec Docker et SearXNG obligatoires dans le profil Full.
+- Constat : après une interruption artificielle du scénario de laboratoire pendant l'étape
+  Docker, le rejeu était refusé au préflight parce que les runtimes déjà installés avaient fait
+  passer l'espace libre sous le seuil initial de 40 Gio.
+- Décision : conserver 40 Gio pour une première installation et appliquer un seuil calculable
+  de 16 Gio uniquement lorsqu'un runtime géré Marvin est déjà présent. Toutes les étapes
+  revalident ensuite leurs composants; aucun contrôle d'intégrité n'est sauté.
+- Fichiers : `scripts/windows-install-components.json`,
+  `scripts/install-marvin-oneclick.ps1`, `scripts/test_installer_contract.py`, métadonnées de
+  version et documentation portable.
+- Validation réelle : contrat installateur et analyse syntaxique PowerShell réussis. La
+  qualification du nouveau paquet signé reste requise avant toute déclaration de portabilité
+  complète.
+- Journalisation : le message d'erreur indique le seuil réellement appliqué sans journaliser
+  de chemin utilisateur, secret ou contenu personnel. La rotation existante reste inchangée.
+- Sécurité : le seuil de reprise n'est activé que par la présence d'un runtime géré; ces
+  runtimes sont ensuite revérifiés. Aucune licence, élévation ou garde Docker n'est contournée.
+- Rollback : réversion atomique de v2.693; aucune donnée persistante n'est migrée.
+
 ## 2026-10-12 — v2.692.0 — profil Windows Full avec Docker et SearXNG requis
 
 - Demande : réactiver Hyper-V et livrer une installation où toutes les fonctions Marvin,

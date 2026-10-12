@@ -2,6 +2,7 @@
   "schema_version": 1,
   "minimum_windows_build": 17763,
   "minimum_free_bytes": 42949672960,
+  "resume_minimum_free_bytes": 17179869184,
   "python": {
     "version": "3.13.15",
     "architecture": "amd64",

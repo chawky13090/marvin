@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.692.0, 364 outils, 400 routes.** Architecture dans
+> **État courant : v2.693.0, 364 outils, 400 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -46,7 +46,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.692.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.693.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -227,7 +227,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.692.0)
+## 9. État actuel (v2.693.0)
+
+**v2.693 (reprise installateur sans faux manque d'espace)** : une installation Windows neuve
+conserve l'exigence de 40 Gio libres. Lorsqu'au moins un runtime Marvin géré et vérifiable est
+déjà présent, une reprise utilise un seuil distinct de 16 Gio, puis revalide normalement chaque
+runtime, dépendance et service. Une installation partielle ne peut donc plus se condamner
+elle-même après avoir consommé une partie de sa réserve initiale. Rollback : réversion atomique
+de v2.693; aucun schéma ni contenu utilisateur n'est modifié.
 
 **v2.692 (profil Windows Full réellement complet)** : le profil d'installation par défaut
 exige Docker Desktop 4.94.0 et SearXNG au lieu de les classer comme options. Le binaire Docker
