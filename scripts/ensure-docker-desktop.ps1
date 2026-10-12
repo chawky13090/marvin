@@ -72,7 +72,9 @@ if ([string]::IsNullOrWhiteSpace($DockerCli)) {
         exit 0
     }
     if (-not $PSCmdlet.ShouldProcess('Docker Desktop', "Installer avec le backend $SelectedBackend")) { exit 2 }
-    $Arguments = @('install', '--quiet', '--accept-license', "--backend=$SelectedBackend", '--always-run-service', '--no-windows-containers')
+    $TargetUser = [Environment]::UserName
+    if ($TargetUser -notmatch '^[A-Za-z0-9._-]{1,64}$') { throw 'Nom utilisateur Windows non admissible pour Docker Desktop.' }
+    $Arguments = @('install', '--quiet', '--accept-license', "--backend=$SelectedBackend", "--user=$TargetUser", '--always-run-service', '--no-windows-containers')
     $Process = Start-Process -FilePath $InstallerPath -ArgumentList $Arguments -Verb RunAs -Wait -PassThru
     if ([int]$Process.ExitCode -notin @(0, 3010)) { throw "Docker Desktop a retourne le code $($Process.ExitCode)." }
     if ([int]$Process.ExitCode -eq 3010) {

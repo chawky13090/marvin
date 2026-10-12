@@ -34,6 +34,9 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
   fixture utilise donc `MARVIN-WIN11\marvin-lab-admin`, une tâche interactive bornée, puis
   supprime tâche et auto-logon avant le checkpoint. Le checkpoint inclut désormais nativement
   `ExposeVirtualizationExtensions=true`; aucun assouplissement d'ACL WindowsApps n'a été fait.
+- L'installation Docker transmet explicitement `--user=<propriétaire Windows>` après validation
+  stricte du nom. Une élévation par un compte d'administration distinct ne peut donc pas laisser
+  Docker installé mais inaccessible à l'utilisateur standard de Marvin.
 
 ## 2026-10-11 — v2.691.0 — signature privée Authenticode du paquet boutique
 

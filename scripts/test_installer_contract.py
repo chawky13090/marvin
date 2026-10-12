@@ -109,6 +109,7 @@ def _assert_static_contract() -> None:
     docker_installer = (ROOT / "scripts" / "ensure-docker-desktop.ps1").read_text(encoding="utf-8")
     assert "--accept-license" in docker_installer
     assert "--always-run-service" in docker_installer
+    assert '"--user=$TargetUser"' in docker_installer
     assert "Test-DockerEngine" in docker_installer
     assert "StartupTimeoutSeconds" in docker_installer
 
