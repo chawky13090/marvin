@@ -37,6 +37,25 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 - L'installation Docker transmet explicitement `--user=<propriétaire Windows>` après validation
   stricte du nom. Une élévation par un compte d'administration distinct ne peut donc pas laisser
   Docker installé mais inaccessible à l'utilisateur standard de Marvin.
+- Validation réelle Docker : l'option `--user` de Docker Desktop a malgré tout ajouté le compte
+  administrateur d'installation, pas le propriétaire standard. Marvin vérifie donc désormais
+  l'appartenance par SID et ajoute explicitement le propriétaire à `docker-users` dans un helper
+  élevé minimal. WSL et Virtual Machine Platform sont activés explicitement, le runtime WSL est
+  installé sans distribution, et une reprise HKCU `RunOnce` est enregistrée avant tout
+  redémarrage requis. Le moteur Linux Docker 29.8.2 a ensuite répondu sous le compte standard
+  `MARVIN-WIN11\marvin`; l'auto-logon de laboratoire utilisé pour créer une vraie session graphique
+  a été supprimé après la preuve.
+- Validation réelle SearXNG : deux incompatibilités PowerShell 5.1/PowerShell Direct ont été
+  révélées avant le pull (`docker port` sur conteneur absent et progression Compose écrite sur
+  stderr). Les deux appels passent désormais par des processus bornés avec sorties isolées.
+  L'image épinglée a démarré sur le loopback 8890, `/config` expose 80 moteurs actifs avec la
+  redondance attendue et une recherche réelle a retourné 68 résultats. Le backend Marvin n'était
+  volontairement pas encore installé dans cette phase, donc seule l'écriture automatique de
+  `searxng_url` reste à prouver pendant le test du paquet signé.
+- Journalisation : aucune sortie de secret n'a été produite; les fichiers secrets temporaires hôte
+  ont été supprimés. Les nouvelles sondes conservent des délais bornés et ne publient le détail
+  Docker/Compose qu'en cas d'échec. Rollback : réversion atomique des sources; dans la VM, restaurer
+  `Marvin-Clean`. Aucun reset Docker, volume ou image utilisateur n'est supprimé.
 
 ## 2026-10-11 — v2.691.0 — signature privée Authenticode du paquet boutique
 

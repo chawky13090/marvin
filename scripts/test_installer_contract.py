@@ -105,11 +105,26 @@ def _assert_static_contract() -> None:
     assert "AppendAllText" in installer and "UTF8Encoding]::new($false)" in installer
     assert "docker_and_searxng_required" in installer
     assert "AcceptDockerDesktopLicense" in installer
+    assert "Register-InstallResumeAfterRestart" in installer
+    assert "MarvinInstallerResume" in installer
+    assert "restart_required" in installer
     assert "DeploymentProfile = 'Full'" in installer
     docker_installer = (ROOT / "scripts" / "ensure-docker-desktop.ps1").read_text(encoding="utf-8")
+    docker_grant = (ROOT / "scripts" / "grant-docker-user-access.ps1").read_text(encoding="utf-8")
+    docker_wsl = (ROOT / "scripts" / "enable-docker-wsl-prerequisites.ps1").read_text(encoding="utf-8")
     assert "--accept-license" in docker_installer
     assert "--always-run-service" in docker_installer
     assert '"--user=$TargetUser"' in docker_installer
+    assert "grant-docker-user-access.ps1" in docker_installer
+    assert "Add-LocalGroupMember" in docker_grant
+    assert "Get-LocalGroupMember" in docker_grant
+    assert "docker-users" in docker_grant
+    assert "Microsoft-Windows-Subsystem-Linux" in docker_wsl
+    assert "VirtualMachinePlatform" in docker_wsl
+    assert "Enable-WindowsOptionalFeature" in docker_wsl
+    assert "--no-distribution" in docker_wsl
+    assert "--web-download" in docker_wsl
+    assert "Invoke-WslBounded" in docker_wsl
     assert "Test-DockerEngine" in docker_installer
     assert "StartupTimeoutSeconds" in docker_installer
 
@@ -192,6 +207,10 @@ def _assert_static_contract() -> None:
     assert "Local\\Marvin.SearXNG.Startup" in searxng_starter
     assert "Local\\Marvin.SearXNG.Startup.SelfTest" in searxng_starter
     assert "function Test-DockerDaemon" in searxng_starter
+    assert "function Get-ExistingSearxngPort" in searxng_starter
+    assert "function Invoke-DockerComposeUp" in searxng_starter
+    assert "Start-Process -FilePath $DockerPath" in searxng_starter
+    assert "if ($LASTEXITCODE -ne 0 -or $portOutput.Count -eq 0)" not in searxng_starter
     assert "$Process.WaitForExit($TimeoutSeconds * 1000)" in searxng_starter
     assert "taskkill.exe /PID $Process.Id /T /F" in searxng_starter
 

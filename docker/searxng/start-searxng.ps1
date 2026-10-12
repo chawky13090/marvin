@@ -94,6 +94,56 @@ function Test-DockerDaemon([string]$DockerPath, [int]$TimeoutSeconds) {
     }
 }
 
+function Get-ExistingSearxngPort([string]$DockerPath) {
+    $Stdout = [System.IO.Path]::GetTempFileName()
+    $Stderr = [System.IO.Path]::GetTempFileName()
+    try {
+        $Process = Start-Process -FilePath $DockerPath `
+            -ArgumentList @('port', 'marvin-searxng', '8080/tcp') `
+            -WindowStyle Hidden -PassThru `
+            -RedirectStandardOutput $Stdout -RedirectStandardError $Stderr
+        if (-not $Process.WaitForExit(10000)) {
+            & taskkill.exe /PID $Process.Id /T /F 2>$null | Out-Null
+            return $null
+        }
+        $Process.WaitForExit()
+        $Process.Refresh()
+        if ([int]$Process.ExitCode -ne 0) { return $null }
+        $Mapped = [System.IO.File]::ReadAllText($Stdout).Trim()
+        $Match = [regex]::Match($Mapped, ':(\d+)$')
+        if (-not $Match.Success) { return $null }
+        return [int]$Match.Groups[1].Value
+    } catch {
+        return $null
+    } finally {
+        Remove-Item -LiteralPath $Stdout, $Stderr -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Invoke-DockerComposeUp([string]$DockerPath, [string]$WorkingDirectory) {
+    $Stdout = [System.IO.Path]::GetTempFileName()
+    $Stderr = [System.IO.Path]::GetTempFileName()
+    try {
+        $Process = Start-Process -FilePath $DockerPath `
+            -ArgumentList @('compose', 'up', '-d', '--remove-orphans') `
+            -WorkingDirectory $WorkingDirectory -WindowStyle Hidden -PassThru `
+            -RedirectStandardOutput $Stdout -RedirectStandardError $Stderr
+        if (-not $Process.WaitForExit(900000)) {
+            & taskkill.exe /PID $Process.Id /T /F 2>$null | Out-Null
+            throw 'docker compose up a depasse quinze minutes.'
+        }
+        $Process.WaitForExit()
+        $Process.Refresh()
+        if ([int]$Process.ExitCode -ne 0) {
+            $Details = ([System.IO.File]::ReadAllText($Stderr) + [System.IO.File]::ReadAllText($Stdout)).Trim()
+            if ($Details.Length -gt 4000) { $Details = $Details.Substring($Details.Length - 4000) }
+            throw "docker compose up a echoue (code $($Process.ExitCode)): $Details"
+        }
+    } finally {
+        Remove-Item -LiteralPath $Stdout, $Stderr -Force -ErrorAction SilentlyContinue
+    }
+}
+
 $script:DetectedDockerCrashLine = $null
 $script:LastRecoveredDockerCrashLine = $null
 
@@ -269,20 +319,16 @@ Write-Host "Demon Docker pret." -ForegroundColor Green
 # -- 2b. Port loopback libre et non exclu par Hyper-V/WSL --------------------
 Write-Step "Selection d'un port SearXNG local disponible..."
 $port = $null
-$mappedPort = @(& docker port marvin-searxng 8080/tcp 2>$null)
-if ($LASTEXITCODE -eq 0 -and $mappedPort.Count -gt 0) {
-    $mappedMatch = [regex]::Match([string]$mappedPort[-1], ':(\d+)$')
-    if ($mappedMatch.Success) {
-        $candidate = [int]$mappedMatch.Groups[1].Value
-        try {
-            $probe = Invoke-WebRequest "http://127.0.0.1:$candidate/config" -UseBasicParsing -TimeoutSec 3
-            if ($probe.StatusCode -eq 200) { $port = $candidate }
-        } catch {}
-    }
+$candidate = Get-ExistingSearxngPort -DockerPath $DockerPath
+if ($null -ne $candidate) {
+    try {
+        $probe = Invoke-WebRequest "http://127.0.0.1:$candidate/config" -UseBasicParsing -TimeoutSec 3
+        if ($probe.StatusCode -eq 200) { $port = $candidate }
+    } catch {}
 }
 if ($null -eq $port) {
     $portOutput = @(& (Join-Path $PSScriptRoot '..\..\scripts\resolve-searxng-port.ps1'))
-    if ($LASTEXITCODE -ne 0 -or $portOutput.Count -eq 0) {
+    if ($portOutput.Count -eq 0) {
         throw "Impossible de sélectionner un port local pour SearXNG."
     }
     $port = [int]$portOutput[-1]
@@ -323,8 +369,7 @@ Push-Location $here
 try {
     # Compose recrée seulement si l'image, le port ou l'empreinte des réglages
     # change. Un start.bat redondant ne coupe donc plus la recherche en cours.
-    docker compose up -d --remove-orphans
-    if ($LASTEXITCODE -ne 0) { throw "docker compose up a echoue (code $LASTEXITCODE)" }
+    Invoke-DockerComposeUp -DockerPath $DockerPath -WorkingDirectory $here
 } finally {
     Pop-Location
 }

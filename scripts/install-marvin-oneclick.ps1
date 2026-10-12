@@ -33,7 +33,29 @@ $DownloadedEvidence = [System.Collections.Generic.List[object]]::new()
 $InstallLogMaxBytes = 2MB
 $InstallLogMaxArchives = 5
 $script:CurrentStage = ''
+$script:DockerLicenseAccepted = [bool]$AcceptDockerDesktopLicense
 if ($DryRunRequested) { $Plan = $true }
+
+function Register-InstallResumeAfterRestart {
+    $Arguments = [System.Collections.Generic.List[string]]::new()
+    $Arguments.Add('-NoProfile')
+    $Arguments.Add('-ExecutionPolicy')
+    $Arguments.Add('Bypass')
+    $Arguments.Add('-File')
+    $Arguments.Add(('"{0}"' -f $PSCommandPath))
+    $Arguments.Add('-DeploymentProfile')
+    $Arguments.Add($DeploymentProfile)
+    if ($NoStart) { $Arguments.Add('-NoStart') }
+    if ($SkipModels) { $Arguments.Add('-SkipModels') }
+    if ($SkipOptional) { $Arguments.Add('-SkipOptional') }
+    if ($script:DockerLicenseAccepted) { $Arguments.Add('-AcceptDockerDesktopLicense') }
+    $Command = 'powershell.exe ' + ($Arguments -join ' ')
+    $RunOnce = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce'
+    New-Item -Path $RunOnce -Force | Out-Null
+    Set-ItemProperty -Path $RunOnce -Name 'MarvinInstallerResume' -Value $Command -Type String
+    Save-State -Status 'restart_required' -CurrentStage $script:CurrentStage -ErrorMessage ''
+    Write-InstallEvent -Stage $script:CurrentStage -Result 'degraded' -Message 'Redemarrage Windows requis; reprise enregistree pour la prochaine ouverture de session.'
+}
 
 function Rotate-InstallLog {
     if (-not (Test-Path -LiteralPath $LogPath -PathType Leaf)) { return }
@@ -496,10 +518,16 @@ try {
                 if (-not $AcceptDockerDesktopLicense -and -not $Plan) {
                     $Answer = Read-Host 'Docker Desktop est requis par le profil Full. Tapez ACCEPTER pour accepter sa licence et continuer'
                     if ($Answer -cne 'ACCEPTER') { throw 'Licence Docker Desktop non acceptee; profil Full interrompu.' }
+                    $script:DockerLicenseAccepted = $true
                 }
                 $DockerArguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'ensure-docker-desktop.ps1'), '-InstallerPath', $DockerInstaller)
                 if ($AcceptDockerDesktopLicense -or $Answer -ceq 'ACCEPTER') { $DockerArguments += '-AcceptLicense' }
                 & powershell.exe @DockerArguments
+                if ($LASTEXITCODE -eq 3010) {
+                    Register-InstallResumeAfterRestart
+                    Write-Host 'Windows doit redemarrer. Marvin reprendra automatiquement a la prochaine ouverture de session.' -ForegroundColor Yellow
+                    exit 3010
+                }
                 if ($LASTEXITCODE -ne 0) { throw 'Docker Desktop requis ne peut pas etre qualifie.' }
             }
             & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ProjectRoot 'docker\searxng\start-searxng.ps1')
