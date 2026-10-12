@@ -75,6 +75,7 @@ recurring-ical-events==3.8.2
 # --- Web par vrai navigateur (anti-blocage) ---
 # Utilise le Chrome installé via channel="chrome" (sinon: python -m playwright install chromium)
 playwright==1.60.0
+pycdlib==1.22.0          # construction ISO Autounattend sans dependance circulaire a Docker
 
 # --- Dates / planification / langue ---
 croniter==6.2.2

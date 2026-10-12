@@ -24,6 +24,11 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
   standard `marvin` d'un administrateur de laboratoire dédié, avec deux secrets DPAPI distincts.
 - Validation acquise : parsing PowerShell, contrat installateur et mode Plan. Reste avant la
   livraison finale : test du paquet signé et du cycle Docker/SearXNG dans la VM propre.
+- Correction de chaîne de preuve : la première recréation de la fixture s'est arrêtée parce que
+  le constructeur de son ISO Autounattend dépendait du démon Docker hôte indisponible. Le média
+  transitoire est désormais construit et relu avec `pycdlib==1.22.0`, sans réseau et sans Docker;
+  le secret n'est jamais affiché et le média reste détruit après installation. Cette séparation
+  supprime la dépendance circulaire « Docker requis pour construire la VM qui qualifie Docker ».
 
 ## 2026-10-11 — v2.691.0 — signature privée Authenticode du paquet boutique
 
