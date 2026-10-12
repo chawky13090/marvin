@@ -11,6 +11,7 @@ $checkpointName = 'Marvin-Clean'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $python = Join-Path $projectRoot 'backend\.venv\Scripts\python.exe'
 $secretPath = Join-Path $projectRoot 'data\.windows-vm-provision-secret.txt'
+$adminSecretPath = Join-Path $projectRoot 'data\.windows-vm-provision-admin-secret.txt'
 $resultPath = Join-Path $projectRoot 'data\windows-vm-provision-result.json'
 $session = $null
 $password = $null
@@ -39,9 +40,14 @@ try {
     if ($vm.State -eq 'Off') { Start-VM -VM $vm | Out-Null }
 
     & $python (Join-Path $PSScriptRoot 'materialize-vm-secret.py') --key vm_lab.windows11.guest_password --output $secretPath | Out-Null
+    & $python (Join-Path $PSScriptRoot 'materialize-vm-secret.py') --key vm_lab.windows11.admin_password --output $adminSecretPath | Out-Null
     & icacls.exe $secretPath /inheritance:r /grant:r "${env:USERNAME}:F" | Out-Null
-    $password = Get-Content -LiteralPath $secretPath -Raw
-    $credential = [PSCredential]::new('marvin', (ConvertTo-SecureString $password -AsPlainText -Force))
+    & icacls.exe $adminSecretPath /inheritance:r /grant:r "${env:USERNAME}:F" | Out-Null
+    $password = Get-Content -LiteralPath $adminSecretPath -Raw
+    $credential = [PSCredential]::new('marvin-lab-admin', (ConvertTo-SecureString $password -AsPlainText -Force))
+    $userPassword = Get-Content -LiteralPath $secretPath -Raw
+    $userCredential = [PSCredential]::new('marvin', (ConvertTo-SecureString $userPassword -AsPlainText -Force))
+    $userPassword = $null
     $session = New-GuestSession -Credential $credential -Deadline (Get-Date).AddMinutes(5)
     Invoke-Command -Session $session -ArgumentList $password -ScriptBlock {
         param([string]$TemporaryPassword)
@@ -51,7 +57,7 @@ try {
         Remove-Item -LiteralPath 'C:\ProgramData\MarvinProvision\install-toolchains.ps1' -Force -ErrorAction SilentlyContinue
         $winlogon = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
         Set-ItemProperty -Path $winlogon -Name AutoAdminLogon -Value '1' -Type String
-        Set-ItemProperty -Path $winlogon -Name DefaultUserName -Value 'marvin' -Type String
+        Set-ItemProperty -Path $winlogon -Name DefaultUserName -Value 'marvin-lab-admin' -Type String
         Set-ItemProperty -Path $winlogon -Name DefaultDomainName -Value ([Environment]::MachineName) -Type String
         Set-ItemProperty -Path $winlogon -Name DefaultPassword -Value $TemporaryPassword -Type String
         Set-ItemProperty -Path $winlogon -Name ForceAutoLogon -Value '1' -Type String
@@ -97,7 +103,7 @@ try {
     $attempt = 0
     while (-not $accepted -and $attempt -lt 3) {
       $attempt++
-      & $winget install --id $package --exact --silent --disable-interactivity --accept-source-agreements --accept-package-agreements
+      & $winget install --id $package --exact --scope machine --silent --disable-interactivity --accept-source-agreements --accept-package-agreements
       $code = $LASTEXITCODE
       $accepted = $code -in @(0, -1978335189, -1978335212, 3010)
       if (-not $accepted -and $attempt -lt 3) {
@@ -157,21 +163,19 @@ try {
         foreach ($file in $sensitiveFiles) { Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue }
         $remoteGroup = Get-LocalGroup -SID 'S-1-5-32-580'
         Add-LocalGroupMember -Group $remoteGroup -Member 'marvin' -ErrorAction SilentlyContinue
-        $adminGroup = Get-LocalGroup -SID 'S-1-5-32-544'
-        Remove-LocalGroupMember -Group $adminGroup -Member 'marvin'
         & shutdown.exe /r /t 0 /f /d p:4:1 /c 'Marvin VM Lab least privilege finalization'
         [ordered]@{ packages=$Packages; build=[Environment]::OSVersion.Version.ToString() }
     }
     Remove-PSSession $session
     $session = $null
     Start-Sleep -Seconds 25
-    $session = New-GuestSession -Credential $credential -Deadline (Get-Date).AddMinutes(10)
+    $session = New-GuestSession -Credential $userCredential -Deadline (Get-Date).AddMinutes(10)
     $evidence = Invoke-Command -Session $session -ScriptBlock {
         $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
         [ordered]@{
             username=[Environment]::UserName; is_admin=$isAdmin
             os=(Get-CimInstance Win32_OperatingSystem).Caption; build=[Environment]::OSVersion.Version.ToString()
-            python=[string](& 'C:\Users\marvin\AppData\Local\Programs\Python\Python313\python.exe' --version 2>&1)
+            python=[string](& (Get-Command python.exe -ErrorAction Stop).Source --version 2>&1)
             node=[string](& 'C:\Program Files\nodejs\node.exe' --version 2>&1)
             git=[string](& 'C:\Program Files\Git\cmd\git.exe' --version 2>&1)
             go=[string](& 'C:\Program Files\Go\bin\go.exe' version 2>&1)
@@ -188,7 +192,7 @@ try {
     Get-VMDvdDrive -VMName $vmName | Set-VMDvdDrive -Path $null
     Set-VMFirmware -VMName $vmName -FirstBootDevice (Get-VMHardDiskDrive -VMName $vmName | Select-Object -First 1) -EnableSecureBoot On
     Start-VM -Name $vmName | Out-Null
-    $session = New-GuestSession -Credential $credential -Deadline (Get-Date).AddMinutes(10)
+    $session = New-GuestSession -Credential $userCredential -Deadline (Get-Date).AddMinutes(10)
     $guestBoot = Invoke-Command -Session $session -ScriptBlock { [ordered]@{ booted=$true; build=[Environment]::OSVersion.Version.ToString() } }
     $firmware = Get-VMFirmware -VMName $vmName
     $secureBoot = [ordered]@{ booted=[bool]$guestBoot.booted; enabled=($firmware.SecureBoot -eq 'On'); template=[string]$firmware.SecureBootTemplate }
@@ -213,4 +217,5 @@ finally {
     if ($session) { Remove-PSSession $session -ErrorAction SilentlyContinue }
     $password = $null
     if (Test-Path -LiteralPath $secretPath) { Remove-Item -LiteralPath $secretPath -Force }
+    if (Test-Path -LiteralPath $adminSecretPath) { Remove-Item -LiteralPath $adminSecretPath -Force }
 }

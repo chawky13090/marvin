@@ -28,12 +28,17 @@ def main() -> int:
         windows = vm_unattended.prepare_windows(root / "windows", image_index=6)
         answer = Path(windows["answer_path"]).read_text(encoding="utf-8")
         password = secrets[vm_unattended.WINDOWS_PASSWORD_SECRET]
+        admin_password = secrets[vm_unattended.WINDOWS_ADMIN_PASSWORD_SECRET]
         assert len(password) == 32
+        assert len(admin_password) == 32 and admin_password != password
         assert password in answer
+        assert admin_password in answer
         assert "<Value>6</Value>" in answer
         assert "VK7JG-NPHTM-C97JM-9MPGT-3V66T" in answer
-        assert "<Group>Administrators</Group>" in answer
-        assert password not in Path(windows["metadata_path"]).read_text(encoding="utf-8")
+        assert "<Name>marvin</Name>" in answer and "<Group>Users</Group>" in answer
+        assert "<Name>marvin-lab-admin</Name>" in answer and "<Group>Administrators</Group>" in answer
+        metadata = Path(windows["metadata_path"]).read_text(encoding="utf-8")
+        assert password not in metadata and admin_password not in metadata
     print("VM unattended OK - SSH sans mot de passe et secret Windows protégé par DPAPI.")
     return 0
 

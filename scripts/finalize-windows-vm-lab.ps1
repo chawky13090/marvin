@@ -63,7 +63,7 @@ try {
             autologon_password_present = [bool]$winlogon.DefaultPassword
             os = (Get-CimInstance Win32_OperatingSystem).Caption
             build = [Environment]::OSVersion.Version.ToString()
-            python = [string](& 'C:\Users\marvin\AppData\Local\Programs\Python\Python313\python.exe' --version 2>&1)
+            python = [string](& (Get-Command python.exe -ErrorAction Stop).Source --version 2>&1)
             node = [string](& 'C:\Program Files\nodejs\node.exe' --version 2>&1)
             git = [string](& 'C:\Program Files\Git\cmd\git.exe' --version 2>&1)
             go = [string](& 'C:\Program Files\Go\bin\go.exe' version 2>&1)

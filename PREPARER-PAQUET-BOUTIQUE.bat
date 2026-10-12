@@ -129,7 +129,8 @@ echo.
 echo Sur le poste cible : verifier l'empreinte communiquee separement, lancer
 echo FAIRE-CONFIANCE-A-MARVIN.bat, puis Marvin-Setup-Private-vX.Y.Z.exe.
 echo Cette signature est privee et ne remplace pas une signature publique Microsoft.
-echo Docker, Hyper-V et Ollama Cloud restent optionnels.
+echo Le profil Full exige Docker Desktop et SearXNG; leur licence doit etre
+echo acceptee explicitement. Le profil Core degrade reste un choix volontaire.
 echo.
 popd
 pause

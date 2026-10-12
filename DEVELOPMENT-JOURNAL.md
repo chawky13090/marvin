@@ -19,7 +19,9 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 - VM : Windows 11 Pro build 26200 recréé, Secure Boot actif, compte `marvin` final standard,
   Python 3.13.15, Node 24.20.0, Git 2.55.0, Go 1.27.0 et .NET 10.0.401 qualifiés. Le checkpoint
   `Marvin-Clean` inclut l'exposition de virtualisation imbriquée. L'ancienne VM reste sauvegardée
-  séparément pour rollback jusqu'à la fin de la qualification du paquet.
+  séparément pour rollback jusqu'à la fin de la qualification du paquet. La qualification Docker
+  exige une élévation réelle : la seconde génération de la fixture sépare donc l'utilisateur
+  standard `marvin` d'un administrateur de laboratoire dédié, avec deux secrets DPAPI distincts.
 - Validation acquise : parsing PowerShell, contrat installateur et mode Plan. Reste avant la
   livraison finale : test du paquet signé et du cycle Docker/SearXNG dans la VM propre.
 

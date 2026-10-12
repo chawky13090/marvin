@@ -23,7 +23,9 @@ import dpapi_secret_store
 
 DEBIAN_KEY_SECRET: Final[str] = "vm_lab.debian13.ssh_private_key"
 WINDOWS_PASSWORD_SECRET: Final[str] = "vm_lab.windows11.guest_password"
+WINDOWS_ADMIN_PASSWORD_SECRET: Final[str] = "vm_lab.windows11.admin_password"
 WINDOWS_USERNAME: Final[str] = "marvin"
+WINDOWS_ADMIN_USERNAME: Final[str] = "marvin-lab-admin"
 DEBIAN_USERNAME: Final[str] = "marvin"
 
 
@@ -139,8 +141,11 @@ def prepare_windows(work_directory: Path, *, image_index: int) -> dict[str, Any]
     if image_index < 1 or image_index > 100:
         raise VMUnattendedError("Index d'image Windows invalide.")
     password = _new_password()
+    admin_password = _new_password()
     dpapi_secret_store.set_secret(WINDOWS_PASSWORD_SECRET, password)
+    dpapi_secret_store.set_secret(WINDOWS_ADMIN_PASSWORD_SECRET, admin_password)
     escaped_password = html.escape(password)
+    escaped_admin_password = html.escape(admin_password)
     answer = f"""<?xml version="1.0" encoding="utf-8"?>
 <unattend xmlns="urn:schemas-microsoft-com:unattend">
   <settings pass="windowsPE">
@@ -173,7 +178,10 @@ def prepare_windows(work_directory: Path, *, image_index: int) -> dict[str, Any]
     <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
       <AutoLogon><Enabled>true</Enabled><LogonCount>1</LogonCount><Username>{WINDOWS_USERNAME}</Username><Password><Value>{escaped_password}</Value><PlainText>true</PlainText></Password></AutoLogon>
       <OOBE><HideEULAPage>true</HideEULAPage><HideOnlineAccountScreens>true</HideOnlineAccountScreens><HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE><NetworkLocation>Work</NetworkLocation><ProtectYourPC>3</ProtectYourPC></OOBE>
-      <UserAccounts><LocalAccounts><LocalAccount wcm:action="add"><Name>{WINDOWS_USERNAME}</Name><DisplayName>Marvin Test Forge</DisplayName><Group>Administrators</Group><Password><Value>{escaped_password}</Value><PlainText>true</PlainText></Password></LocalAccount></LocalAccounts></UserAccounts>
+      <UserAccounts><LocalAccounts>
+        <LocalAccount wcm:action="add"><Name>{WINDOWS_USERNAME}</Name><DisplayName>Marvin Test Forge</DisplayName><Group>Users</Group><Password><Value>{escaped_password}</Value><PlainText>true</PlainText></Password></LocalAccount>
+        <LocalAccount wcm:action="add"><Name>{WINDOWS_ADMIN_USERNAME}</Name><DisplayName>Marvin Lab Administrator</DisplayName><Group>Administrators</Group><Password><Value>{escaped_admin_password}</Value><PlainText>true</PlainText></Password></LocalAccount>
+      </LocalAccounts></UserAccounts>
       <RegisteredOwner>Marvin Test Forge</RegisteredOwner><TimeZone>Romance Standard Time</TimeZone>
     </component>
   </settings>
@@ -185,12 +193,15 @@ def prepare_windows(work_directory: Path, *, image_index: int) -> dict[str, Any]
     metadata_path = work_directory / "metadata.json"
     _metadata(metadata_path, {
         "profile": "windows11", "created_at": time.time(), "username": WINDOWS_USERNAME,
+        "admin_username": WINDOWS_ADMIN_USERNAME,
         "image_index": image_index, "authentication": "random_password_dpapi",
         "answer_file_contains_transient_secret": True, "must_destroy_after_installation": True,
     })
     password = ""
+    admin_password = ""
     return {
         "answer_path": str(answer_path), "metadata_path": str(metadata_path),
         "username": WINDOWS_USERNAME, "secret_key": WINDOWS_PASSWORD_SECRET,
+        "admin_username": WINDOWS_ADMIN_USERNAME, "admin_secret_key": WINDOWS_ADMIN_PASSWORD_SECRET,
         "contains_transient_secret": True,
     }

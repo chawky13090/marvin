@@ -24,6 +24,7 @@ $python = Join-Path $projectRoot 'backend\.venv\Scripts\python.exe'
 $resultPath = Join-Path $projectRoot 'data\windows-vm-install-result.json'
 $provisionResultPath = Join-Path $projectRoot 'data\windows-vm-provision-result.json'
 $secretPath = Join-Path $projectRoot 'data\.windows-vm-install-secret.txt'
+$adminSecretPath = Join-Path $projectRoot 'data\.windows-vm-install-admin-secret.txt'
 $expectedIsoHash = 'A02693BEB8EB166AFDFDB7DB49176A2B547F81E61030A695FE172277DB6A1977'
 $session = $null
 $password = $null
@@ -109,9 +110,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'La génération du média Autounattend a échoué.' }
 
     & $python (Join-Path $PSScriptRoot 'materialize-vm-secret.py') --key vm_lab.windows11.guest_password --output $secretPath | Out-Null
+    & $python (Join-Path $PSScriptRoot 'materialize-vm-secret.py') --key vm_lab.windows11.admin_password --output $adminSecretPath | Out-Null
     & icacls.exe $secretPath /inheritance:r /grant:r "${env:USERNAME}:F" | Out-Null
-    $password = Get-Content -LiteralPath $secretPath -Raw
-    $credential = [PSCredential]::new('marvin', (ConvertTo-SecureString $password -AsPlainText -Force))
+    & icacls.exe $adminSecretPath /inheritance:r /grant:r "${env:USERNAME}:F" | Out-Null
+    $password = Get-Content -LiteralPath $adminSecretPath -Raw
+    $credential = [PSCredential]::new('marvin-lab-admin', (ConvertTo-SecureString $password -AsPlainText -Force))
     $password = $null
 
     New-Item -ItemType Directory -Path $vmDirectory -Force | Out-Null
@@ -175,4 +178,5 @@ finally {
     if ($session) { Remove-PSSession $session -ErrorAction SilentlyContinue }
     $password = $null
     if (Test-Path -LiteralPath $secretPath) { Remove-Item -LiteralPath $secretPath -Force }
+    if (Test-Path -LiteralPath $adminSecretPath) { Remove-Item -LiteralPath $adminSecretPath -Force }
 }
