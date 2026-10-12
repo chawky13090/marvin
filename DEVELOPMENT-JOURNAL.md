@@ -56,6 +56,10 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
   ont été supprimés. Les nouvelles sondes conservent des délais bornés et ne publient le détail
   Docker/Compose qu'en cas d'échec. Rollback : réversion atomique des sources; dans la VM, restaurer
   `Marvin-Clean`. Aucun reset Docker, volume ou image utilisateur n'est supprimé.
+- Construction boutique : le ZIP reproductible produit par `Compress-Archive` expose ses chemins
+  avec des séparateurs Windows dans `ZipArchive`. Le signataire privé accepte désormais `\` ou `/`
+  uniquement devant le nom terminal `package-manifest.json`, tout en exigeant exactement une entrée;
+  aucune recherche approximative ou manifeste alternatif n'est admis.
 
 ## 2026-10-11 — v2.691.0 — signature privée Authenticode du paquet boutique
 

@@ -59,7 +59,9 @@ if ($LASTEXITCODE -ne 0 -or $GitCommit -notmatch '^[0-9a-f]{40}$') { throw 'Comm
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $Archive = [IO.Compression.ZipFile]::OpenRead($ZipPath)
 try {
-    $ManifestEntries = @($Archive.Entries | Where-Object { $_.FullName -match '(^|/)package-manifest\.json$' })
+    # ZipArchive conserve parfois les separateurs Windows produits par
+    # Compress-Archive. Le nom doit rester strictement terminal et unique.
+    $ManifestEntries = @($Archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])package-manifest\.json$' })
     if ($ManifestEntries.Count -ne 1) { throw 'Le ZIP doit contenir un unique package-manifest.json.' }
     $Reader = [IO.StreamReader]::new($ManifestEntries[0].Open(), [Text.Encoding]::UTF8, $true)
     try { $PackageManifest = $Reader.ReadToEnd() | ConvertFrom-Json } finally { $Reader.Dispose() }

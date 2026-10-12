@@ -152,6 +152,7 @@ def _assert_static_contract() -> None:
     assert "Microsoft.PowerShell.Security.psd1" in private_builder
     assert "Get-CertificateWithRetry" in private_builder
     assert "package-manifest.json" in private_builder
+    assert "(^|[\\\\/])package-manifest\\.json$" in private_builder
     assert "Le ZIP ne provient pas du commit Git courant" in private_builder
     assert "ConvertFrom-SecureString" in private_builder
     assert "'/inheritance:r'" in private_builder
