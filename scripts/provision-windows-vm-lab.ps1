@@ -44,9 +44,9 @@ try {
     & icacls.exe $secretPath /inheritance:r /grant:r "${env:USERNAME}:F" | Out-Null
     & icacls.exe $adminSecretPath /inheritance:r /grant:r "${env:USERNAME}:F" | Out-Null
     $password = Get-Content -LiteralPath $adminSecretPath -Raw
-    $credential = [PSCredential]::new('marvin-lab-admin', (ConvertTo-SecureString $password -AsPlainText -Force))
+    $credential = [PSCredential]::new('MARVIN-WIN11\marvin-lab-admin', (ConvertTo-SecureString $password -AsPlainText -Force))
     $userPassword = Get-Content -LiteralPath $secretPath -Raw
-    $userCredential = [PSCredential]::new('marvin', (ConvertTo-SecureString $userPassword -AsPlainText -Force))
+    $userCredential = [PSCredential]::new('MARVIN-WIN11\marvin', (ConvertTo-SecureString $userPassword -AsPlainText -Force))
     $userPassword = $null
     $session = New-GuestSession -Credential $credential -Deadline (Get-Date).AddMinutes(5)
     Invoke-Command -Session $session -ArgumentList $password -ScriptBlock {
@@ -64,12 +64,10 @@ try {
         Set-ItemProperty -Path $winlogon -Name AutoLogonCount -Value 10 -Type DWord
         & shutdown.exe /r /t 0 /f /d p:4:1 /c 'Marvin VM Lab provisioning'
     }
-    $password = $null
     Remove-PSSession $session
     $session = $null
     Start-Sleep -Seconds 30
     $session = New-GuestSession -Credential $credential -Deadline (Get-Date).AddMinutes(10)
-
     $interactiveReady = Invoke-Command -Session $session -ScriptBlock {
         $deadline = (Get-Date).AddMinutes(5)
         do {
@@ -78,7 +76,7 @@ try {
         } while (-not $explorer -and (Get-Date) -lt $deadline)
         [bool]$explorer
     }
-    if (-not $interactiveReady) { throw 'La session locale Marvin ne s est pas ouverte.' }
+    if (-not $interactiveReady) { throw 'La session graphique du compte de laboratoire ne s est pas ouverte.' }
 
     $taskInfo = Invoke-Command -Session $session -ScriptBlock {
         $root = 'C:\ProgramData\MarvinProvision'
@@ -123,13 +121,14 @@ try {
 '@
         Set-Content -LiteralPath $scriptPath -Value $content -Encoding UTF8
         $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
-        $principal = New-ScheduledTaskPrincipal -UserId 'marvin' -LogonType Interactive -RunLevel Highest
-        $trigger = New-ScheduledTaskTrigger -AtLogOn -User 'marvin'
+        $principal = New-ScheduledTaskPrincipal -UserId 'MARVIN-WIN11\marvin-lab-admin' -LogonType Interactive -RunLevel Highest
+        $trigger = New-ScheduledTaskTrigger -AtLogOn -User 'MARVIN-WIN11\marvin-lab-admin'
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 2) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
         Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Trigger $trigger -Settings $settings -Force | Out-Null
         Start-ScheduledTask -TaskName $taskName
         [ordered]@{ task_name=$taskName; result_path=$resultPath; root=$root }
     }
+    $password = $null
 
     $deadline = (Get-Date).AddMinutes($TimeoutMinutes)
     $packageResult = $null
@@ -202,6 +201,7 @@ try {
     $deadline = (Get-Date).AddMinutes(5)
     do { Start-Sleep -Seconds 5; $vm = Get-VM -Name $vmName } while ($vm.State -ne 'Off' -and (Get-Date) -lt $deadline)
     if ($vm.State -ne 'Off') { throw 'Arrêt final Windows impossible.' }
+    Set-VMProcessor -VMName $vmName -ExposeVirtualizationExtensions $true
     Get-VMCheckpoint -VMName $vmName -Name $checkpointName -ErrorAction SilentlyContinue | Remove-VMCheckpoint -Confirm:$false
     Checkpoint-VM -Name $vmName -SnapshotName $checkpointName | Out-Null
     & $python (Join-Path $PSScriptRoot 'configure-hyperv-runner-from-vm.py') | Out-Null
@@ -214,6 +214,15 @@ catch {
     throw
 }
 finally {
+    if ($session -and $session.State -eq 'Opened') {
+        Invoke-Command -Session $session -ScriptBlock {
+            Unregister-ScheduledTask -TaskName 'Marvin-Provision-Toolchains' -Confirm:$false -ErrorAction SilentlyContinue
+            $winlogon = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
+            Remove-ItemProperty -Path $winlogon -Name DefaultPassword -ErrorAction SilentlyContinue
+            Set-ItemProperty -Path $winlogon -Name AutoAdminLogon -Value '0' -Type String
+            Set-ItemProperty -Path $winlogon -Name ForceAutoLogon -Value '0' -Type String
+        } -ErrorAction SilentlyContinue
+    }
     if ($session) { Remove-PSSession $session -ErrorAction SilentlyContinue }
     $password = $null
     if (Test-Path -LiteralPath $secretPath) { Remove-Item -LiteralPath $secretPath -Force }

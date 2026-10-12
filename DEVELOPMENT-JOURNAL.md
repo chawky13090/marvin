@@ -29,6 +29,11 @@ mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
   transitoire est désormais construit et relu avec `pycdlib==1.22.0`, sans réseau et sans Docker;
   le secret n'est jamais affiché et le média reste détruit après installation. Cette séparation
   supprime la dépendance circulaire « Docker requis pour construire la VM qui qualifie Docker ».
+- Durcissement du provisionnement : PowerShell Direct exige une identité locale qualifiée après
+  l'ouverture d'une session graphique, et Winget refuse les jetons batch sur WindowsApps. La
+  fixture utilise donc `MARVIN-WIN11\marvin-lab-admin`, une tâche interactive bornée, puis
+  supprime tâche et auto-logon avant le checkpoint. Le checkpoint inclut désormais nativement
+  `ExposeVirtualizationExtensions=true`; aucun assouplissement d'ACL WindowsApps n'a été fait.
 
 ## 2026-10-11 — v2.691.0 — signature privée Authenticode du paquet boutique
 

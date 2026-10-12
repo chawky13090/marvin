@@ -114,7 +114,7 @@ try {
     & icacls.exe $secretPath /inheritance:r /grant:r "${env:USERNAME}:F" | Out-Null
     & icacls.exe $adminSecretPath /inheritance:r /grant:r "${env:USERNAME}:F" | Out-Null
     $password = Get-Content -LiteralPath $adminSecretPath -Raw
-    $credential = [PSCredential]::new('marvin-lab-admin', (ConvertTo-SecureString $password -AsPlainText -Force))
+    $credential = [PSCredential]::new('MARVIN-WIN11\marvin-lab-admin', (ConvertTo-SecureString $password -AsPlainText -Force))
     $password = $null
 
     New-Item -ItemType Directory -Path $vmDirectory -Force | Out-Null

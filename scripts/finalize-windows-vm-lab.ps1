@@ -49,7 +49,7 @@ try {
     & $python (Join-Path $PSScriptRoot 'materialize-vm-secret.py') --key vm_lab.windows11.guest_password --output $secretPath | Out-Null
     & icacls.exe $secretPath /inheritance:r /grant:r "${env:USERNAME}:F" | Out-Null
     $password = Get-Content -LiteralPath $secretPath -Raw
-    $credential = [PSCredential]::new('marvin', (ConvertTo-SecureString $password -AsPlainText -Force))
+    $credential = [PSCredential]::new('MARVIN-WIN11\marvin', (ConvertTo-SecureString $password -AsPlainText -Force))
     $password = $null
 
     $session = New-GuestSession -Credential $credential -Deadline (Get-Date).AddMinutes($TimeoutMinutes)
