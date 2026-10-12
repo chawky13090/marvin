@@ -525,12 +525,17 @@ try {
 
     if ($DeploymentProfile -eq 'Full') {
         Invoke-InstallStage -Name 'docker_and_searxng_required' -Action {
-            $DockerCli = Get-Command docker.exe -ErrorAction SilentlyContinue
-            $DockerReady = $false
-            if ($DockerCli) {
-                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'ensure-docker-desktop.ps1')
-                $DockerReady = $LASTEXITCODE -eq 0
+            # Le PATH du processus courant peut dater d'avant l'installation
+            # Docker. Le helper résout aussi le chemin canonique Program Files
+            # et constitue donc l'unique source de vérité.
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'ensure-docker-desktop.ps1')
+            $DockerEnsureExitCode = $LASTEXITCODE
+            if ($DockerEnsureExitCode -eq 3010) {
+                Register-InstallResumeAfterRestart
+                Write-Host 'Windows doit redemarrer. Marvin reprendra automatiquement a la prochaine ouverture de session.' -ForegroundColor Yellow
+                exit 3010
             }
+            $DockerReady = $DockerEnsureExitCode -eq 0
             if (-not $DockerReady) {
                 $DockerComponent = $Components.docker_desktop
                 $Answer = ''

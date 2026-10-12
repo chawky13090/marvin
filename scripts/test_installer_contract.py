@@ -94,6 +94,8 @@ def _assert_static_contract() -> None:
         "Save-State",
         "Get-MinimumFreeBytesForCurrentRun",
         "resume_minimum_free_bytes",
+        "DockerEnsureExitCode",
+        "unique source de vérité",
         "WhatIfPreference",
     )
     for token in required_installer_tokens:

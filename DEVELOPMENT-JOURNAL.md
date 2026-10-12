@@ -5,6 +5,21 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-10-12 — v2.694.0 — Docker résolu par le helper canonique lors des reprises
+
+- Constat réel en VM : Docker Engine répondait sous le compte standard, mais le processus
+  installateur conservait un PATH créé avant l'installation de Docker. L'étape Full interprétait
+  alors Docker comme absent et attendait à tort une nouvelle acceptation de licence.
+- Correction : l'étape Full appelle systématiquement `ensure-docker-desktop.ps1`. Ce helper
+  résout le CLI dans le PATH ou sous `Program Files`, vérifie réellement le moteur et conserve
+  le code 3010 lorsque Windows doit redémarrer.
+- Validation avant paquet : contrat installateur, parsing PowerShell et gate architecture.
+  La qualification signée en VM reste le critère de livraison.
+- Journalisation et sécurité : aucun secret, chemin personnel ou sortie Docker brute n'est
+  ajouté aux logs. La licence reste explicitement requise lorsque Docker est réellement absent.
+- Rollback : réversion atomique de v2.694; aucun volume, conteneur ou réglage Docker n'est
+  supprimé ou réécrit.
+
 ## 2026-10-12 — v2.693.0 — reprise installateur après consommation de la réserve disque
 
 - Demande : poursuivre la qualification du paquet boutique signé sur une VM Windows vierge,
