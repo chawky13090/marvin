@@ -131,6 +131,7 @@ def _assert_static_contract() -> None:
     assert "--web-download" in docker_wsl
     assert "Invoke-WslBounded" in docker_wsl
     assert "Test-DockerEngine" in docker_installer
+    assert "HypervisorPresent" in docker_installer
     assert "StartupTimeoutSeconds" in docker_installer
 
     assert "git archive" in package_builder

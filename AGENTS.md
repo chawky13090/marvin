@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.694.0, 364 outils, 400 routes.** Architecture dans
+> **État courant : v2.695.0, 364 outils, 400 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -46,7 +46,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.694.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.695.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -227,7 +227,14 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.694.0)
+## 9. État actuel (v2.695.0)
+
+**v2.695 (Docker qualifié correctement sous hyperviseur)** : un moteur Docker répondant est
+désormais la preuve prioritaire et n'est plus rejeté par un indicateur CIM contradictoire. Pour
+une installation neuve, la détection accepte soit les capacités processeur exposées, soit
+`Win32_ComputerSystem.HypervisorPresent`, nécessaire aux invités Windows avec virtualisation
+imbriquée. Les timeouts et exigences de licence restent inchangés. Rollback : réversion
+atomique de v2.695; aucun état Docker ou donnée Marvin n'est modifié.
 
 **v2.694 (Docker qualifié sans dépendance au PATH hérité)** : le profil Full invoque toujours
 le helper Docker canonique, qui résout `docker.exe` dans le PATH ou sous `Program Files`, au

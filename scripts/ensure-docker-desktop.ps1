@@ -13,6 +13,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 function Test-HardwareVirtualization {
+    $ComputerSystem = Get-CimInstance Win32_ComputerSystem | Select-Object -First 1
+    if ($null -ne $ComputerSystem -and [bool]$ComputerSystem.HypervisorPresent) { return $true }
     $Processor = Get-CimInstance Win32_Processor | Select-Object -First 1
     if ($null -eq $Processor) { return $false }
     return [bool]$Processor.VirtualizationFirmwareEnabled -or [bool]$Processor.VMMonitorModeExtensions
@@ -68,14 +70,14 @@ function Ensure-CurrentUserDockerAccess {
     }
 }
 
-if (-not (Test-HardwareVirtualization)) {
-    throw 'La virtualisation materielle VT-x/AMD-V est indisponible. Le profil Full ne peut pas garantir Docker.'
-}
-
 $DockerCli = Resolve-DockerCli
 if (-not [string]::IsNullOrWhiteSpace($DockerCli) -and (Test-DockerEngine $DockerCli)) {
     Write-Output "Docker Engine deja disponible : $DockerCli"
     exit 0
+}
+
+if (-not (Test-HardwareVirtualization)) {
+    throw 'La virtualisation materielle VT-x/AMD-V est indisponible. Le profil Full ne peut pas garantir Docker.'
 }
 
 $SelectedBackend = $Backend

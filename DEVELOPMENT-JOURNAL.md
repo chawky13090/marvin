@@ -5,6 +5,22 @@ Ce fichier est la mémoire de travail lisible par Codex, Claude ou un autre main
 fichiers modifiés, validations et travaux restant éventuellement à faire. Ne jamais y copier de
 mot de passe, jeton OAuth, clé privée ou contenu d'e-mail confidentiel.
 
+## 2026-10-12 — v2.695.0 — détection Docker fiable dans une VM Windows imbriquée
+
+- Diagnostic reproduit dans la session graphique standard de la VM : Docker Engine 29.8.2
+  répondait, mais `Win32_Processor.VirtualizationFirmwareEnabled` et
+  `VMMonitorModeExtensions` restaient faux. Le helper rejetait donc le profil Full avant sa
+  sonde moteur.
+- Correction : un moteur répondant est accepté en premier. Sans moteur, la capacité matérielle
+  accepte aussi `Win32_ComputerSystem.HypervisorPresent`, tout en conservant le refus lorsque
+  aucune preuve de virtualisation n'existe.
+- Validation prévue : sonde du helper dans la même session graphique, puis paquet Authenticode
+  reconstruit et cycle Full complet. Les tests statiques et syntaxiques restent obligatoires.
+- Sécurité et logs : aucune garde de licence, de groupe Windows ou d'intégrité n'est retirée;
+  aucune sortie Docker détaillée ou donnée personnelle n'est ajoutée aux logs.
+- Rollback : réversion atomique de v2.695; aucun volume, conteneur ou état utilisateur n'est
+  modifié.
+
 ## 2026-10-12 — v2.694.0 — Docker résolu par le helper canonique lors des reprises
 
 - Constat réel en VM : Docker Engine répondait sous le compte standard, mais le processus
