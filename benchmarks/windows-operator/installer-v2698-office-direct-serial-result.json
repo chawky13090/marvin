@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "observed_on": "2026-10-13",
+  "runtime_source_commit": "dd69b58883efddcad37dcc813041a6d9c3a17f7d",
+  "manage_libreoffice_sha256": "454062e918a219ae42e5695a7f11e22af42825432d9edea898fd202ba67d26c5",
+  "component_manifest_sha256": "7f949ad39df5dde9dff05e7148a857258c606192c181bcb1451fe055898b26c1",
+  "precondition_office_absent": true,
+  "other_office_campaign_running": false,
+  "installer_backend": "Direct",
+  "winget_invoked": false,
+  "elevated_lab_identity": true,
+  "interactive_uac_tested": false,
+  "exit_code": 0,
+  "capability_status": "available",
+  "libreoffice_version": "26.2.5.2",
+  "libreoffice_verified": true,
+  "scope": "Office_component_only",
+  "full_marvin_installation_certified": false,
+  "cloud_tested": false,
+  "historical_results_modified": false
+}

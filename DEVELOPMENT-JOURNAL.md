@@ -1,5 +1,18 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — Office direct, rejeu séquentiel du code courant réussi
+
+- Après désinstallation confirmée et fin de tous les moniteurs, nouveau dossier
+  OfficeDirect2698r3. Préconditions : Office absent et aucune autre campagne Office
+  active. Source runtime dd69b58883efddcad37dcc813041a6d9c3a17f7d avec délais
+  async explicites. Résultat : code 0, LibreOffice 26.2.5.2 available et verified.
+- Preuve séparée avec SHA-256 du script et du manifeste. Les premiers résultats
+  et l'erratum de concurrence ne sont pas modifiés. Le premier accès PSDirect après
+  boot a échoué avant création du dossier; reprise d'accès sans action MSI préalable.
+- Périmètre : composant Office, compte admin de laboratoire, sans invocation WinGet.
+  Aucune certification Full globale, d'UAC standard ou Cloud. Retour de la VM à son
+  checkpoint de laboratoire; aucune donnée du poste hôte modifiée.
+
 ## 2026-10-13 — erratum, fin tardive de la première tentative Office
 
 - Le moniteur de la première tentative a finalement rendu code 0 après lancement
