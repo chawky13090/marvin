@@ -102,6 +102,47 @@ function Stop-ManagedOllamaForUpdate {
     }
 }
 
+function Invoke-LocalDocker([string[]]$Arguments, [int]$TimeoutSeconds = 30) {
+    $Docker = Join-Path $env:ProgramFiles 'Docker\Docker\resources\bin\docker.exe'
+    $Out = [IO.Path]::GetTempFileName()
+    $Err = [IO.Path]::GetTempFileName()
+    $Process = $null
+    try {
+        $Process = Start-Process -FilePath $Docker -ArgumentList (@('--host', 'npipe:////./pipe/dockerDesktopLinuxEngine') + $Arguments) -WindowStyle Hidden -PassThru -RedirectStandardOutput $Out -RedirectStandardError $Err
+        if (-not $Process.WaitForExit($TimeoutSeconds * 1000)) {
+            & taskkill.exe /PID $Process.Id /T /F 2>$null | Out-Null
+            throw 'Le moteur Docker local ne repond pas pendant la preparation de mise a jour.'
+        }
+        $Process.WaitForExit()
+        return [pscustomobject]@{ exit_code=[int]$Process.ExitCode; output=[IO.File]::ReadAllText($Out) }
+    } finally {
+        if ($null -ne $Process) { $Process.Dispose() }
+        Remove-Item -LiteralPath $Out,$Err -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Test-InstallationMount([object[]]$Mounts) {
+    $Prefix = $InstallRoot.TrimEnd('\') + '\'
+    foreach ($Mount in $Mounts) {
+        if ([string]$Mount.Type -ne 'bind') { continue }
+        $Source = [string]$Mount.Source
+        if ($Source.Equals($InstallRoot,[StringComparison]::OrdinalIgnoreCase) -or $Source.StartsWith($Prefix,[StringComparison]::OrdinalIgnoreCase)) { return $true }
+    }
+    return $false
+}
+
+function Stop-ManagedSearxngForUpdate {
+    if (-not (Test-Path -LiteralPath (Join-Path $InstallRoot 'docker\searxng\settings.yml') -PathType Leaf)) { return }
+    $Docker = Join-Path $env:ProgramFiles 'Docker\Docker\resources\bin\docker.exe'
+    if (-not (Test-Path -LiteralPath $Docker -PathType Leaf)) { return }
+    $Inspection = Invoke-LocalDocker -Arguments @('inspect','--format','"{{json .Mounts}}"','marvin-searxng')
+    if ($Inspection.exit_code -ne 0) { return }
+    $Mounts = @($Inspection.output | ConvertFrom-Json)
+    if (-not (Test-InstallationMount $Mounts)) { return }
+    $Stopped = Invoke-LocalDocker -Arguments @('stop','--time','20','marvin-searxng')
+    if ($Stopped.exit_code -ne 0) { throw 'Le conteneur SearXNG gere ne peut pas etre arrete pour la mise a jour.' }
+}
+
 $InstallPhase = 'prepare'
 try {
     if (-not $SamePackage) {
@@ -120,6 +161,8 @@ try {
                 if ($LASTEXITCODE -ne 0) { throw 'L ancienne installation Marvin ne peut pas etre arretee.' }
             }
             Stop-InstalledLauncher
+            $InstallPhase = 'stop_managed_searxng'
+            Stop-ManagedSearxngForUpdate
             $InstallPhase = 'stop_managed_ollama'
             Stop-ManagedOllamaForUpdate
             $InstallPhase = 'backup_previous_code'

@@ -1,5 +1,25 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — diagnostic d'installation complet et montage SearXNG
+
+- Le diagnostic du paquet avec le correctif d'arrêt Ollama a atteint
+  `completed` : dépendances, Docker/SearXNG, LibreOffice obligatoire,
+  build, raccourcis et validation runtime réussis. Les modèles agents locaux
+  restent explicitement dégradés dans cette VM.
+- Après installation, Docker inspect confirme un bind de settings.yml dans
+  le dossier Marvin. Pour les mises à jour, le conteneur local marvin-searxng
+  est arrêté seulement si un bind appartient à cette racine exacte.
+  Aucun conteneur externe ni volume n'est supprimé. Les appels sont bornés
+  et ciblent le tube local Docker Desktop Linux, sans utiliser un contexte distant.
+- Tests de périmètre : bind interne accepté, préfixe externe rejeté,
+  volume ignoré; contrat installateur et processus géré/externe réussis.
+- Un défaut UTF-8 dans le nouveau test est corrigé avec decode de repli.
+  Le runner de validation et la documentation canonique repassent leurs tests.
+- Le résultat diagnostique reste distinct de l'EXE signé : le rejeu du paquet
+  reconstruit et le nettoyage du profil VM restent nécessaires avant clôture.
+- Rollback : réversion atomique pour le code, backup précédent conservé par
+  l'installeur; modèles, données Docker et données Marvin préservés.
+
 ## 2026-10-13 — verrou de mise à jour identifié sur Ollama géré
 
 - La capture d'erreur localise le blocage sur `backup_previous_code`, ligne

@@ -571,7 +571,13 @@ def _assert_managed_ollama_update_is_scoped() -> None:
                 "-and $n.Name -eq 'Stop-ManagedOllamaForUpdate'},$true)\n"
                 "if(-not $f){throw 'Managed runtime guard absent'}\n"
                 ". ([scriptblock]::Create($f.Extent.Text))\n"
-                "Stop-ManagedOllamaForUpdate\n",
+                "Stop-ManagedOllamaForUpdate\n"
+                "$m=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] "
+                "-and $n.Name -eq 'Test-InstallationMount'},$true)\n"
+                ". ([scriptblock]::Create($m.Extent.Text))\n"
+                "if(-not (Test-InstallationMount @([pscustomobject]@{Type='bind';Source=($InstallRoot+'\\settings.yml')}))){throw 'Owned mount missed'}\n"
+                "if(Test-InstallationMount @([pscustomobject]@{Type='bind';Source=($InstallRoot+'-external\\settings.yml')})){throw 'External mount accepted'}\n"
+                "if(Test-InstallationMount @([pscustomobject]@{Type='volume';Source=$InstallRoot})){throw 'Volume must remain untouched'}\n",
                 encoding="utf-8",
             )
             time.sleep(0.5)
@@ -595,7 +601,8 @@ def main() -> int:
     assert node, "Node.js est requis pour verifier le cycle de vie frontend."
     lifecycle = subprocess.run(
         [node, "scripts/test_next_production_lifecycle.mjs"], cwd=ROOT,
-        capture_output=True, text=True, timeout=30, check=False,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        timeout=30, check=False,
     )
     assert lifecycle.returncode == 0, lifecycle.stderr
     _assert_plan_is_non_mutating()
