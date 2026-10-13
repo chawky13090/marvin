@@ -196,7 +196,11 @@ try {
     if ($SkipOptional) { $Arguments += '-SkipOptional' }
     $Arguments += @('-DeploymentProfile', $DeploymentProfile)
     if ($AcceptDockerDesktopLicense) { $Arguments += '-AcceptDockerDesktopLicense' }
-    $Process = Start-Process -FilePath 'powershell.exe' -ArgumentList $Arguments -WorkingDirectory $InstallRoot -Wait -PassThru
+    # -Wait attend aussi les descendants Windows, dont les serveurs que
+    # l'installation vient de démarrer. Attendre uniquement le processus
+    # installateur permet au paquet de terminer en laissant Marvin actif.
+    $Process = Start-Process -FilePath 'powershell.exe' -ArgumentList $Arguments -WorkingDirectory $InstallRoot -PassThru
+    $Process.WaitForExit()
     if ($Process.ExitCode -ne 0) {
         if (Test-Path -LiteralPath $Backup) { Restore-PreviousInstall }
         throw "L installation des composants Marvin a echoue (code $($Process.ExitCode))."

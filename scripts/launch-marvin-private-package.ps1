@@ -30,7 +30,8 @@ try {
     Expand-Archive -LiteralPath $Archive -DestinationPath $Destination
     $Launcher = Get-ChildItem -LiteralPath $Destination -Filter 'INSTALLER-MARVIN.bat' -File -Recurse | Select-Object -First 1
     if ($null -eq $Launcher) { throw 'Lanceur Marvin absent du paquet extrait.' }
-    $Process = Start-Process -FilePath $Launcher.FullName -WorkingDirectory $Launcher.DirectoryName -Wait -PassThru
+    $Process = Start-Process -FilePath $Launcher.FullName -WorkingDirectory $Launcher.DirectoryName -PassThru
+    $Process.WaitForExit()
     exit $Process.ExitCode
 } finally {
     if (Test-Path -LiteralPath $Destination) { Remove-Item -LiteralPath $Destination -Recurse -Force }

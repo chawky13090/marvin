@@ -1,5 +1,20 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — l'installation termine sans attendre les serveurs descendants
+
+- Le processus installateur utilisait `Start-Process -Wait`, qui attend sous
+  Windows tout l'arbre descendant. Les serveurs Marvin lancés après installation
+  maintenaient donc le lanceur actif même avec un état completed.
+- Le lanceur privé et le lanceur de composants attendent désormais uniquement
+  leur enfant direct via Process.WaitForExit. Ils gardent son code de sortie et
+  laissent les serveurs installés fonctionner.
+- Régression exécutée : un faux installateur démarre un processus persistant
+  et termine; le paquet retourne 0 avant 30 s tandis que le runtime demeure actif.
+  Le test nettoie ensuite exclusivement ce processus identifié.
+- Le rejeu signé précédent a atteint completed et les services sont fonctionnels;
+  cette nouvelle révision doit encore confirmer la fermeture effective de l'EXE.
+- Rollback code par réversion atomique; aucune donnée ou configuration migrée.
+
 ## 2026-10-13 — diagnostic d'installation complet et montage SearXNG
 
 - Le diagnostic du paquet avec le correctif d'arrêt Ollama a atteint

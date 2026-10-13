@@ -402,13 +402,19 @@ def _assert_package_preflight_is_non_mutating() -> None:
         assert not target.exists()
 
 
-def _write_fake_package(package: Path, source_commit: str, marker: str, exit_code: int) -> None:
+def _write_fake_package(package: Path, source_commit: str, marker: str, exit_code: int, *, spawn_child: bool = False) -> None:
     package.mkdir(parents=True, exist_ok=True)
     payload = package / "payload.zip"
     fake_installer = (
         "param([switch]$NoStart,[switch]$SkipModels,[switch]$SkipOptional)\n"
-        f"exit {exit_code}\n"
     )
+    if spawn_child:
+        fake_installer += (
+            "$p=Start-Process powershell.exe -ArgumentList '-NoProfile','-Command','Start-Sleep -Seconds 45' "
+            "-WindowStyle Hidden -PassThru -RedirectStandardOutput child-out.txt -RedirectStandardError child-err.txt\n"
+            "[IO.File]::WriteAllText((Join-Path (Split-Path $PSScriptRoot -Parent) 'child.pid'),[string]$p.Id)\n"
+        )
+    fake_installer += f"exit {exit_code}\n"
     with zipfile.ZipFile(payload, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("scripts/install-marvin-oneclick.ps1", fake_installer)
         archive.writestr("version-marker.txt", marker)
@@ -456,6 +462,29 @@ def _assert_package_install_and_rollback_support_spaces() -> None:
         assert failed.returncode != 0
         assert (target / "version-marker.txt").read_text(encoding="utf-8") == "stable"
         assert data_marker.read_text(encoding="utf-8") == "preserved"
+
+
+def _assert_package_finishes_with_runtime_child_alive() -> None:
+    import psutil
+
+    with tempfile.TemporaryDirectory(prefix="marvin package child ") as temp:
+        package = Path(temp) / "package"
+        target = Path(temp) / "target" / "Marvin"
+        _write_fake_package(package, "3" * 40, "child", 0, spawn_child=True)
+        started = time.time()
+        process = None
+        try:
+            result = _run_powershell(package / "install-marvin-package.ps1", "-InstallRoot", str(target))
+            assert result.returncode == 0, result.stderr
+            process = psutil.Process(int((target / "child.pid").read_text()))
+            assert process.create_time() >= started - 1
+            assert "Start-Sleep" in " ".join(process.cmdline())
+            assert process.is_running(), "Le paquet a attendu la terminaison du runtime."
+            assert time.time() - started < 30, "Le paquet attend encore ses descendants."
+        finally:
+            if process is not None and process.is_running():
+                process.kill()
+                process.wait(timeout=5)
 
 
 def _assert_install_log_rotation_and_encoding() -> None:
@@ -611,6 +640,7 @@ def main() -> int:
     _assert_searxng_startup_is_single_instance()
     _assert_package_preflight_is_non_mutating()
     _assert_package_install_and_rollback_support_spaces()
+    _assert_package_finishes_with_runtime_child_alive()
     _assert_install_log_rotation_and_encoding()
     _assert_uninstall_refuses_unmarked_root()
     _assert_uninstall_completes_and_removes_linked_rollback()
