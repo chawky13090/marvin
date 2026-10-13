@@ -2,6 +2,11 @@
 
 ## 2026-10-13 — résultat réel Office direct avec streaming corrigé
 
+- Renforcement supplémentaire : chaque attente async est bornée par le temps
+  restant d'un chronomètre total, en plus du CancellationToken. Le contrat ne
+  suppose donc pas qu'un flux réseau honore l'annulation. Test réel Task.Delay
+  rejeté en 10 ms et tâche terminée acceptée; aucun seuil de téléchargement augmenté.
+
 - Nouveau test réel sous identité administrateur du laboratoire, InstallerBackend=Direct,
   aucune invocation WinGet. Résultat observé : code 0, LibreOffice 26.2.5.2 disponible
   et soffice --version vérifié; diagnostic vide. Source runtime du commit 4d4eec6.

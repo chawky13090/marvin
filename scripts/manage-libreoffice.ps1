@@ -77,27 +77,34 @@ function Wait-LibreOfficeOperation($Process) {
     $Process.WaitForExit()
 }
 
+function Wait-OfficeDownloadTask($Task, $Clock, [int]$LimitMilliseconds = 300000) {
+    $Remaining = [int][Math]::Max(0, $LimitMilliseconds - $Clock.ElapsedMilliseconds)
+    if (-not $Task.Wait($Remaining)) { throw 'Transfert Office non confirme dans le delai total; fichier partiel refuse.' }
+    return $Task.GetAwaiter().GetResult()
+}
+
 function Save-OfficeDownload([Uri]$Uri, [string]$Path) {
     Add-Type -AssemblyName System.Net.Http
     $Handler = [Net.Http.HttpClientHandler]::new()
     $Handler.AllowAutoRedirect = $false
     $Client = [Net.Http.HttpClient]::new($Handler)
     $Cancellation = [Threading.CancellationTokenSource]::new(300000)
+    $Clock = [Diagnostics.Stopwatch]::StartNew()
     $Response = $null
     $InputStream = $null
     $OutputStream = $null
     try {
         $Client.Timeout = [TimeSpan]::FromSeconds(300)
-        $Response = $Client.GetAsync($Uri, [Net.Http.HttpCompletionOption]::ResponseHeadersRead, $Cancellation.Token).GetAwaiter().GetResult()
+        $Response = Wait-OfficeDownloadTask ($Client.GetAsync($Uri, [Net.Http.HttpCompletionOption]::ResponseHeadersRead, $Cancellation.Token)) $Clock
         $Response.EnsureSuccessStatusCode() | Out-Null
         $MaximumBytes = 512MB
         if ($Response.Content.Headers.ContentLength -gt $MaximumBytes) { throw 'Composant Office trop volumineux.' }
-        $InputStream = $Response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
+        $InputStream = Wait-OfficeDownloadTask ($Response.Content.ReadAsStreamAsync()) $Clock
         $OutputStream = [IO.File]::Open($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
         $Buffer = [byte[]]::new(65536)
         $Total = 0L
         do {
-            $Read = $InputStream.ReadAsync($Buffer, 0, $Buffer.Length, $Cancellation.Token).GetAwaiter().GetResult()
+            $Read = Wait-OfficeDownloadTask ($InputStream.ReadAsync($Buffer, 0, $Buffer.Length, $Cancellation.Token)) $Clock
             $Total += $Read
             if ($Total -gt $MaximumBytes) { throw 'Composant Office trop volumineux.' }
             if ($Read -gt 0) { $OutputStream.Write($Buffer, 0, $Read) }

@@ -29,11 +29,16 @@ try {
 } finally { $Process.Dispose() }
 Write-Output 'LibreOffice timeout OK - succes et interruption bornee.'
 
-foreach ($Name in @('Get-PinnedOfficeInstaller','Invoke-PinnedOfficeInstaller','Invoke-DirectOfficeRemoval')) {
+foreach ($Name in @('Get-PinnedOfficeInstaller','Invoke-PinnedOfficeInstaller','Invoke-DirectOfficeRemoval','Wait-OfficeDownloadTask')) {
     $Definition = $Ast.Find({param($Node) $Node -is [Management.Automation.Language.FunctionDefinitionAst] -and $Node.Name -eq $Name}, $true)
     if (-not $Definition) { throw "Fonction absente : $Name" }
     . ([scriptblock]::Create($Definition.Extent.Text))
 }
+$Clock=[Diagnostics.Stopwatch]::StartNew()
+$Rejected=$false
+try { Wait-OfficeDownloadTask ([Threading.Tasks.Task]::Delay(1000)) $Clock 10 } catch { $Rejected=$true }
+if (-not $Rejected -or $Clock.ElapsedMilliseconds -gt 500) { throw 'Attente reseau non bornee.' }
+Wait-OfficeDownloadTask ([Threading.Tasks.Task]::FromResult(7)) ([Diagnostics.Stopwatch]::StartNew()) 1000 | Out-Null
 $ProjectRoot = Join-Path ([IO.Path]::GetTempPath()) ('marvin-office-test-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path (Join-Path $ProjectRoot 'runtime\install\downloads') -Force | Out-Null
 try {
