@@ -170,6 +170,7 @@ def stages(*, quick: bool, live: bool) -> list[Stage]:
         Stage("Fermeture explicite de Qdrant", (python, "scripts/test_vector_store_lifecycle.py")),
         Stage("Boucle réseau résiliente du backend Windows", (python, "scripts/test_windows_event_loop.py")),
         Stage("Installation Windows portable", (python, "scripts/test_installer_contract.py")),
+        Stage("LibreOffice timeout", ("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "scripts/test_libreoffice_timeout.ps1")),
         Stage("ACL Windows des données Marvin", (python, "scripts/test_data_acl.py")),
         Stage("Sauvegarde globale chiffrée", (python, "scripts/test_full_backup.py")),
         Stage(

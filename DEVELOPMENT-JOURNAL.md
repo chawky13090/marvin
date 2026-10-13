@@ -1,5 +1,24 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — LibreOffice installé réellement dans la VM
+
+- Le redistribuable Microsoft Visual C++ x64 a été installé par l'identité
+  d'administration dédiée au laboratoire : SHA-256 exact et signature Microsoft
+  valides, code de sortie 0.
+- LibreOffice 26.2.5.2 x64 a été téléchargé depuis l'archive officielle de The
+  Document Foundation et vérifié avec le SHA-256 du manifeste Microsoft Winget
+  `f15ba07bfcb0186986cf3171063506f5d207c11f8cc051ba0d135209e9e915f9`.
+  Le MSI a retourné 0 et `soffice --headless --version` confirme 26.2.5.2.
+- Cette préparation de laboratoire ne certifie pas encore le parcours UAC complet
+  du paquet sur poste neuf. Le rejeu du paquet signé est en cours pour contrôler
+  la détection utilisateur, les services et le résultat final.
+- Le test positif/négatif du timeout LibreOffice est désormais une étape du gate.
+- La tentative précédente avait un plan local limité à `nomic-embed-text`; la
+  VM attribue 4 Gio à Windows, Docker et Marvin. La qualification agent locale
+  reste dégradée et n'est pas présentée comme réussie.
+- Aucun secret inscrit dans les logs. Retour arrière disponible par checkpoint
+  VM; réversion du commit pour l'étape de gate, sans migration produit.
+
 ## 2026-10-13 — LibreOffice obligatoire dans le profil Full
 
 - Demande propriétaire : LibreOffice est obligatoire. Le profil Full traite
