@@ -11,6 +11,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 
 $ProjectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $ManifestPath = Join-Path $PSScriptRoot 'libreoffice-component.json'
@@ -76,6 +77,40 @@ function Wait-LibreOfficeOperation($Process) {
     $Process.WaitForExit()
 }
 
+function Save-OfficeDownload([Uri]$Uri, [string]$Path) {
+    Add-Type -AssemblyName System.Net.Http
+    $Handler = [Net.Http.HttpClientHandler]::new()
+    $Handler.AllowAutoRedirect = $false
+    $Client = [Net.Http.HttpClient]::new($Handler)
+    $Cancellation = [Threading.CancellationTokenSource]::new(300000)
+    $Response = $null
+    $InputStream = $null
+    $OutputStream = $null
+    try {
+        $Client.Timeout = [TimeSpan]::FromSeconds(300)
+        $Response = $Client.GetAsync($Uri, [Net.Http.HttpCompletionOption]::ResponseHeadersRead, $Cancellation.Token).GetAwaiter().GetResult()
+        $Response.EnsureSuccessStatusCode() | Out-Null
+        $MaximumBytes = 512MB
+        if ($Response.Content.Headers.ContentLength -gt $MaximumBytes) { throw 'Composant Office trop volumineux.' }
+        $InputStream = $Response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
+        $OutputStream = [IO.File]::Open($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        $Buffer = [byte[]]::new(65536)
+        $Total = 0L
+        do {
+            $Read = $InputStream.ReadAsync($Buffer, 0, $Buffer.Length, $Cancellation.Token).GetAwaiter().GetResult()
+            $Total += $Read
+            if ($Total -gt $MaximumBytes) { throw 'Composant Office trop volumineux.' }
+            if ($Read -gt 0) { $OutputStream.Write($Buffer, 0, $Read) }
+        } while ($Read -gt 0)
+    } finally {
+        if ($OutputStream) { $OutputStream.Dispose() }
+        if ($InputStream) { $InputStream.Dispose() }
+        if ($Response) { $Response.Dispose() }
+        $Cancellation.Dispose()
+        $Client.Dispose()
+    }
+}
+
 function Get-PinnedOfficeInstaller($Component) {
     $Uri = [Uri]$Component.url
     if ($Uri.Scheme -ne 'https' -or $Uri.Host -notin @('downloadarchive.documentfoundation.org', 'download.visualstudio.microsoft.com')) {
@@ -92,7 +127,7 @@ function Get-PinnedOfficeInstaller($Component) {
     $Temporary = $Path + '.' + [guid]::NewGuid().ToString('N') + '.partial'
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -Uri $Uri -UseBasicParsing -OutFile $Temporary -TimeoutSec 300
+        Save-OfficeDownload $Uri $Temporary
         if ((Get-FileHash -LiteralPath $Temporary -Algorithm SHA256).Hash.ToLowerInvariant() -ne [string]$Component.sha256) {
             throw 'SHA-256 du composant Office invalide; execution interdite.'
         }

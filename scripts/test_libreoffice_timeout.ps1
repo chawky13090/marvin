@@ -50,7 +50,7 @@ try {
     $Rejected=$false
     try { Get-PinnedOfficeInstaller $Bad | Out-Null } catch { $Rejected=$true }
     if (-not $Rejected) { throw 'Origine non autorisee acceptee.' }
-    function Invoke-WebRequest { param($Uri,[switch]$UseBasicParsing,$OutFile,$TimeoutSec) [IO.File]::WriteAllText($OutFile,'corrupted') }
+    function Save-OfficeDownload { param($Uri,$Path) [IO.File]::WriteAllText($Path,'corrupted') }
     [IO.File]::WriteAllText($File, 'corrupted-cache')
     $Rejected=$false
     try { Get-PinnedOfficeInstaller $Component | Out-Null } catch { if($_.Exception.Message -notlike '*SHA-256*'){throw};$Rejected=$true }

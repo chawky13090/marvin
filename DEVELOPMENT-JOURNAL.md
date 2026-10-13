@@ -1,5 +1,23 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — Office direct, téléchargement réel interrompu et streaming borné
+
+- Premier test réel du chemin Direct en compte administrateur de laboratoire :
+  prérequis VC++ franchi, mais téléchargement MSI par Invoke-WebRequest resté
+  actif au-delà de 600 s sans fichier publié. Le timeout déclaré ne constituait
+  pas une borne fiable de transfert dans ce chemin Windows PowerShell 5.1.
+  Arrêt ciblé du processus portant exactement OfficeDirect2698, aucun rejeu MSI.
+- Remplacement par HttpClient ResponseHeadersRead, token d'annulation de 300 s
+  couvrant requête et lectures, plafond 512 Mio y compris transfert sans Content-Length,
+  aucune redirection automatique, buffer 64 Kio et fichier partiel exclusif.
+  ProgressPreference silencieux. Les vérifications SHA et signature sont conservées.
+- L'EXE candidat construit depuis a589342 ne porte pas cette correction et ne doit
+  pas être déclaré qualifié. Garder ses octets et reconstruire seulement après tests.
+- Tests de contrat LibreOffice exécutés et réussis après modification. Le test réel
+  suivant utilise un autre dossier; aucune preuve de la première tentative réécrite.
+- Limite : le compte élevé valide l'installation système mais pas l'interaction UAC.
+  VC++ reste partagé; il n'est pas retiré automatiquement après cette tentative.
+
 ## 2026-10-13 — v2.698, provisionnement Office direct sans WinGet
 
 - Premier préflight du test élevé : WinGet est disponible pour le compte admin
