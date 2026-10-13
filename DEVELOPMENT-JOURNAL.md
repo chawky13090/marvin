@@ -1,5 +1,18 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — état de qualification après installation LibreOffice
+
+- Le rejeu signé depuis `2b58ce7` a échoué sur SearXNG pendant une panne
+  Docker Desktop. Le retour arrière du paquet a été déclenché et l'état
+  `failed/docker_and_searxng_required` a été retrouvé.
+- Après redémarrage contrôlé de Docker, moteur 29.8.2 confirmé, conteneur
+  SearXNG actif, 80 moteurs et 73 résultats de recherche réelle.
+- Contrôle runtime de l'installation restaurée : backend HTTP sain,
+  version 2.695.0, 364 outils; LibreOffice 26.2.5.2 répond. Frontend HTTP
+  non confirmé dans les cinq minutes. Le diagnostic du lanceur continue.
+- Le paquet Full complet reste non qualifié; ces succès individuels ne
+  constituent pas une acceptation globale. Aucun contenu utilisateur supprimé.
+
 ## 2026-10-13 — LibreOffice installé réellement dans la VM
 
 - Le redistribuable Microsoft Visual C++ x64 a été installé par l'identité
