@@ -549,8 +549,48 @@ def _assert_uninstall_completes_and_removes_linked_rollback() -> None:
             receipt.unlink(missing_ok=True)
 
 
+def _assert_managed_ollama_update_is_scoped() -> None:
+    node = shutil.which("node")
+    assert node and POWERSHELL
+    with tempfile.TemporaryDirectory(prefix="marvin-managed-runtime-") as directory:
+        root = Path(directory)
+        managed = root / "runtime" / "managed" / "ollama"
+        managed.mkdir(parents=True)
+        executable = managed / "ollama.exe"
+        shutil.copy2(node, executable)
+        owned = subprocess.Popen([str(executable), "-e", "setInterval(()=>{},1000)"])
+        external = subprocess.Popen([node, "-e", "setInterval(()=>{},1000)"])
+        try:
+            script = root / "probe.ps1"
+            script.write_text(
+                "param([string]$InstallRoot,[string]$Source)\n"
+                "$ErrorActionPreference='Stop'\n"
+                "$errors=$null\n"
+                "$ast=[Management.Automation.Language.Parser]::ParseFile($Source,[ref]$null,[ref]$errors)\n"
+                "$f=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] "
+                "-and $n.Name -eq 'Stop-ManagedOllamaForUpdate'},$true)\n"
+                "if(-not $f){throw 'Managed runtime guard absent'}\n"
+                ". ([scriptblock]::Create($f.Extent.Text))\n"
+                "Stop-ManagedOllamaForUpdate\n",
+                encoding="utf-8",
+            )
+            time.sleep(0.5)
+            result = _run_powershell(
+                script, str(root), str(ROOT / "scripts/install-marvin-package.ps1")
+            )
+            assert result.returncode == 0, result.stderr
+            owned.wait(timeout=5)
+            assert external.poll() is None, "Un runtime externe a ete arrete."
+        finally:
+            for process in (owned, external):
+                if process.poll() is None:
+                    process.kill()
+                process.wait(timeout=5)
+
+
 def main() -> int:
     _assert_static_contract()
+    _assert_managed_ollama_update_is_scoped()
     node = shutil.which("node")
     assert node, "Node.js est requis pour verifier le cycle de vie frontend."
     lifecycle = subprocess.run(

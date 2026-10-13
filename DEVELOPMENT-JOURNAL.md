@@ -1,5 +1,25 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — verrou de mise à jour identifié sur Ollama géré
+
+- La capture d'erreur localise le blocage sur `backup_previous_code`, ligne
+  de renommage de l'ancien dossier. Aucun serveur Marvin ni lanceur ne restait
+  actif; le conteneur SearXNG montait un fichier de laboratoire hors installation.
+- Le processus restant était l'Ollama fourni dans `runtime/managed/ollama`.
+  Son exécutable ouvert empêchait le renommage Windows de l'installation.
+- L'installeur arrête désormais uniquement les processus dont le chemin
+  exécutable est sous ce runtime géré, attend leur terminaison bornée, puis
+  effectue la sauvegarde. Les modèles sont conservés; Ollama est relancé par
+  les étapes normales. Une installation externe n'est pas concernée.
+- Le diagnostic patched du paquet a franchi le renommage et atteint les
+  dépendances backend. Ce diagnostic ne remplace pas le rejeu de l'EXE reconstruit.
+- Test réel isolé : faux runtime géré arrêté, processus externe conservé;
+  contrat installateur complet réussi. Les erreurs portent désormais une phase
+  fixe et un numéro de ligne, sans ajouter de secret aux journaux.
+- Rollback : réversion atomique du code; les données restent dans le dossier
+  préservé et le code précédent dans le backup de mise à jour. La VM conserve
+  son checkpoint d'origine.
+
 ## 2026-10-13 — cycle de vie du frontend distribué
 
 - L'arrêt du serveur production lancé directement par Next nécessitait le

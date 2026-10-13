@@ -88,8 +88,24 @@ function Stop-InstalledLauncher {
     }
 }
 
+function Stop-ManagedOllamaForUpdate {
+    $ManagedOllama = [IO.Path]::GetFullPath((Join-Path $InstallRoot 'runtime\managed\ollama')) + [IO.Path]::DirectorySeparatorChar
+    foreach ($Process in @(Get-CimInstance Win32_Process)) {
+        $Executable = [string]$Process.ExecutablePath
+        if (-not $Executable.StartsWith($ManagedOllama, [StringComparison]::OrdinalIgnoreCase)) { continue }
+        $Handle = Get-Process -Id $Process.ProcessId -ErrorAction SilentlyContinue
+        if ($null -eq $Handle) { continue }
+        try {
+            Stop-Process -Id $Handle.Id -Force -ErrorAction Stop
+            if (-not $Handle.WaitForExit(10000)) { throw 'Le runtime Ollama gere reste actif.' }
+        } finally { $Handle.Dispose() }
+    }
+}
+
+$InstallPhase = 'prepare'
 try {
     if (-not $SamePackage) {
+        $InstallPhase = 'extract_staging'
         New-Item -ItemType Directory -Path $Parent -Force | Out-Null
         Expand-Archive -LiteralPath $PayloadPath -DestinationPath $Staging -Force
         foreach ($Required in @($Manifest.required_files)) {
@@ -97,18 +113,24 @@ try {
             if (-not (Test-Path -LiteralPath $RequiredPath -PathType Leaf)) { throw "Payload incomplet : $Required" }
         }
         if (Test-Path -LiteralPath $InstallRoot -PathType Container) {
+            $InstallPhase = 'stop_previous_runtime'
             $Stop = Join-Path $InstallRoot 'scripts\stop-marvin.ps1'
             if (Test-Path -LiteralPath $Stop) {
                 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Stop -AllowActiveWorkInterruption
                 if ($LASTEXITCODE -ne 0) { throw 'L ancienne installation Marvin ne peut pas etre arretee.' }
             }
             Stop-InstalledLauncher
+            $InstallPhase = 'stop_managed_ollama'
+            Stop-ManagedOllamaForUpdate
+            $InstallPhase = 'backup_previous_code'
             Move-Item -LiteralPath $InstallRoot -Destination $Backup
+            $InstallPhase = 'preserve_user_data'
             foreach ($Name in @('data', 'runtime', '.env.local')) {
                 $Old = Join-Path $Backup $Name
                 if (Test-Path -LiteralPath $Old) { Move-Item -LiteralPath $Old -Destination (Join-Path $Staging $Name) }
             }
         }
+        $InstallPhase = 'activate_new_code'
         Move-Item -LiteralPath $Staging -Destination $InstallRoot
         $MetadataPath = Join-Path $InstallRoot 'runtime\install\package.json'
         New-Item -ItemType Directory -Path (Split-Path -Parent $MetadataPath) -Force | Out-Null
@@ -123,6 +145,7 @@ try {
         [IO.File]::WriteAllText($MetadataPath, ($Metadata | ConvertTo-Json -Depth 6), [Text.UTF8Encoding]::new($false))
     }
 
+    $InstallPhase = 'install_components'
     $Installer = Join-Path $InstallRoot 'scripts\install-marvin-oneclick.ps1'
     $Arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $Installer))
     if ($NoStart) { $Arguments += '-NoStart' }
@@ -141,6 +164,6 @@ try {
     exit 0
 } catch {
     if (Test-Path -LiteralPath $Staging) { Remove-Item -LiteralPath $Staging -Recurse -Force -ErrorAction SilentlyContinue }
-    Write-Error $_
+    Write-Error ("Installation phase={0}, source_line={1}: {2}" -f $InstallPhase, $_.InvocationInfo.ScriptLineNumber, $_.Exception.Message)
     exit 1
 }
