@@ -1,5 +1,28 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — v2.697, cause LibreOffice sur compte standard sans WinGet
+
+- Après restauration de Marvin-Clean, le rejeu Core termine avec code 1.
+  Preflight, runtimes Python/Node/Ollama, dépendances backend/frontend et données
+  passent. LibreOffice échoue avant build et démarrage; aucun succès implicite.
+- Le rapport data/libreoffice-capability.json confirme WinGet absent dans le
+  compte test. Le parcours dépend donc toujours de WinGet pour provisionner Office;
+  aucune disponibilité universelle de LibreOffice ne peut être annoncée.
+- Alternative retenue pour la prochaine implémentation : provisionnement MSI
+  direct x64 et dépendance VC++ épinglés, téléchargés depuis leurs éditeurs,
+  SHA-256 issus des manifestes officiels Microsoft winget-pkgs vérifiés le 13/10.
+  Garder élévation explicite, opérations bornées, postcondition soffice et reprise3010.
+  L'autre option (provisionner WinGet avant Office) ajoute une dépendance AppInstaller
+  et une activation par utilisateur; elle ne traite pas le besoin d'indépendance.
+- Sources : TheDocumentFoundation.LibreOffice 26.2.5.2 (MSI x64 SHA
+  f15ba07bfcb0186986cf3171063506f5d207c11f8cc051ba0d135209e9e915f9),
+  Microsoft.VCRedist.2015+.x64 14.51.36247.0 (SHA
+  843068991daaa1f73ad9f6239bce4d0f6a07a51f18c37ea2a867e9beca71295c).
+  Aucune nouvelle branche runtime n'est livrée dans cette publication.
+- Preuve : installer-v2697-core-libreoffice-failed.json; sans secrets ni identifiants
+  de session. Les deux échecs sont conservés et ne remplacent pas la preuve v2.696.
+  Rollback de publication par réversion atomique; aucun changement de données hôte.
+
 ## 2026-10-13 — documentation de livraison Full/Core et signature privée
 
 - INSTALLATION.md conservait les versions et contrats de v2.657. Mise à jour
