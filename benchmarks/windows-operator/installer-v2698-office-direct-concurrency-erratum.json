@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "observed_on": "2026-10-13",
+  "source_result": "installer-v2698-office-direct-result.json",
+  "source_result_sha256": "362ab7a373df0a794ad40d4a71208c81718838fe3c65d08a3e2d195d76ade712",
+  "source_result_modified": false,
+  "first_attempt_late_exit_code": 0,
+  "first_attempt_stop_confirmed": false,
+  "overlap_between_attempts_possible": true,
+  "independent_runtime_certification_authorized": false,
+  "performance_comparison_authorized": false,
+  "observed_installation_and_uninstallation_retained": true,
+  "required_next_step": "serial_replay_current_source_after_confirmed_uninstall"
+}

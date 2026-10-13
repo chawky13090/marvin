@@ -1,5 +1,17 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — erratum, fin tardive de la première tentative Office
+
+- Le moniteur de la première tentative a finalement rendu code 0 après lancement
+  du second test. L'arrêt demandé n'avait pas de reçu confirmant la terminaison.
+  Corriger la lecture des entrées précédentes : pas d'arrêt confirmé; chevauchement
+  possible, donc aucun comparatif de performance ni certification runtime isolée.
+- Erratum externe lié par SHA-256 au résultat; les artefacts d'origine restent
+  inchangés. Installation et désinstallation observées restent des faits, pas une
+  preuve d'indépendance. Tous les moniteurs terminés avant prochain rejeu.
+- La VM a été arrêtée proprement et le contrôle E7 est revenu vert. Le prochain
+  rejeu utilise le code courant dans un nouveau dossier après désinstallation confirmée.
+
 ## 2026-10-13 — rollback réel Office direct
 
 - Le produit installé uniquement pour le test a été retiré par Action Uninstall,
