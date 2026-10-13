@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "observed_on": "2026-10-13",
+  "source_commit": "606bdc1d61b694b7827c1a5c502159a2bfd1d005",
+  "package_sha256": "2080984c94637e8266a4b59b5d0568fffe3237411219261c64251f82f99a93b9",
+  "profile": "Core",
+  "standard_user": true,
+  "fresh_installation_directory": true,
+  "status": "aborted_preflight",
+  "cause": "guest_free_space_below_required_40_GiB",
+  "installer_exit_code": null,
+  "exit_code_observation": "not_captured_by_lab_monitor",
+  "installation_certified": false,
+  "full_profile_certified": false,
+  "cloud_tested": false,
+  "host_data_modified": false,
+  "threshold_changed": false
+}

@@ -1,5 +1,29 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — v2.697, qualification Core interrompue au preflight disque
+
+- Nouveau dossier cible dans la VM, compte standard par PowerShell Direct,
+  profil Core explicite, aucun démarrage de serveur ni connexion Cloud demandés.
+  Transfert ZIP vérifié par SHA-256 avant extraction.
+- Le préflight a refusé le démarrage faute de 40 Gio libres dans l'invité.
+  Aucun seuil abaissé et aucune suppression sur l'hôte. La mesure du code
+  de sortie par le moniteur local est null : il ne faut pas l'inventer.
+- Preuve conservée : installer-v2697-core-preflight-aborted.json. Cette tentative
+  ne certifie ni l'installation Core, ni Full, ni un Windows vierge.
+- La fenêtre de création de compte a été fermée; aucun mot de passe existant
+  n'a été réinitialisé par les commandes de qualification. Les accès administrateur
+  et standard préexistants restent utilisables. Ne pas activer d'autologon en clair.
+- Les résultats du gate r3 sont 379 passés / 0 échec / 6 skipped. Ce run commencé
+  avant v2.697 et terminé pendant son développement n'est pas une attestation
+  atomique de v2.697; les tests ciblés de v2.697 restent la preuve de son correctif.
+- Aucun nouveau stockage produit ni secret dans la preuve; rollback de cette
+  publication par réversion atomique. Les répertoires de laboratoire restent
+  disponibles pour diagnostic et aucun nettoyage automatique n'a été effectué.
+- Après publication de l'échec, remise à zéro explicite de la VM par restauration
+  de Marvin-Clean, sans suppression de fichiers de l'hôte. L'invité dispose alors
+  de 62 781 001 728 octets libres; le rejeu Core démarre sur cette base. Ce checkpoint
+  est une base de laboratoire, pas une preuve d'OS vierge certifiée.
+
 ## 2026-10-13 — v2.697, reprise du paquet après redémarrage requis
 
 - Analyse : restaurer l'ancien code sur tout retour non nul détruit la cible
