@@ -603,6 +603,11 @@ try {
     if ($DeploymentProfile -eq 'Full' -or -not $SkipOptional) {
         Invoke-InstallStage -Name 'libreoffice_required' -Action {
             & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'manage-libreoffice.ps1') -Action Ensure
+            if ($LASTEXITCODE -eq 3010) {
+                Register-InstallResumeAfterRestart
+                Write-Host 'Redemarrage requis par Office; reprise automatique a la prochaine ouverture de session.' -ForegroundColor Yellow
+                exit 3010
+            }
             if ($LASTEXITCODE -ne 0) { throw 'LibreOffice obligatoire non qualifie; installation interrompue.' }
         }
     } else {

@@ -1,5 +1,30 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — v2.698, provisionnement Office direct sans WinGet
+
+- Alternative retenue : fallback MSI/VC++ explicite, plutôt que réinstaller
+  AppInstaller et dépendre de son activation par utilisateur. Aucun changement
+  lorsque Office répond déjà ou lorsque WinGet est disponible.
+- Composants versionnés via les manifestes officiels Microsoft winget-pkgs :
+  LibreOffice x64 26.2.5.2 et VC++ x64 14.51.36247.0. Origines HTTPS limitées
+  aux éditeurs, SHA-256 avant publication cache puis sous verrou lecture avant
+  lancement. VC++ exige une signature Authenticode valide Microsoft.
+- UAC limité aux deux composants système; aucune clé, mot de passe ou token.
+  Téléchargement 300 s, opérations 900 s par défaut, aucun retry automatique
+  sur résultat ambigu. Un timeout d'un processus élevé peut laisser une installation
+  système active : reçu indéterminé, vérification obligatoire avant nouvelle tentative.
+- Reprise3010 raccordée à l'installateur existant. Désinstallation directe limitée
+  au ProductCode épinglé, postcondition Office absent; VC++ partagé reste installé.
+- Tests exécutés : timeout positif/négatif, cache hashé, origine et traversal refusés,
+  payload corrompu, mutation avant lancement, reprise3010 et ProductCode invalide.
+  Ces tests contrôlent le harnais, pas une installation MSI réelle avec UAC.
+- Journalisation : rapport de capacité existant et événements d'installation existants;
+  aucune nouvelle donnée personnelle ni magasin. Cache dans le répertoire de downloads
+  déjà géré par l'installateur; pas de logs MSI verbeux. Aucun secret dans les diagnostics.
+- Rollback : réversion atomique du code; retirer Office via Action Uninstall si installé
+  pour le test. La compatibilité du format de rapport est conservée. Pas de suppression
+  automatique d'un Office préexistant, ni d'un runtime VC++ système partagé.
+
 ## 2026-10-13 — v2.697, cause LibreOffice sur compte standard sans WinGet
 
 - Après restauration de Marvin-Clean, le rejeu Core termine avec code 1.

@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.697.0, 364 outils, 400 routes.** Architecture dans
+> **État courant : v2.698.0, 364 outils, 400 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -46,7 +46,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.697.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.698.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -227,7 +227,17 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.697.0)
+## 9. État actuel (v2.698.0)
+
+**v2.698 (LibreOffice sans WinGet)** : si WinGet manque, LibreOffice utilise son
+MSI x64 26.2.5.2 et VC++ 14.51.36247.0 depuis leurs éditeurs, SHA-256 épinglés.
+VC++ exige aussi Authenticode Microsoft; fichiers verrouillés en lecture entre
+vérification et lancement. UAC reste explicite, attente bornée, aucun reboot forcé,
+3010 enregistre la reprise. La désinstallation directe vise seulement le ProductCode
+épinglé de cette version. Tests négatifs/positifs intégrés au gate LibreOffice.
+Rollback code par réversion atomique; Office peut être retiré explicitement via
+manage-libreoffice.ps1 -Action Uninstall. VC++ partagé n'est jamais supprimé.
+La validation runtime du nouveau chemin reste nécessaire avant certification.
 
 **v2.697 (reprise du paquet après redémarrage requis)** : le code de sortie 3010
 des composants est propagé sans restaurer l'ancien code. La cible du RunOnce
