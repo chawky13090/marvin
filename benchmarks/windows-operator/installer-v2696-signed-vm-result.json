@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "observed_on": "2026-10-13",
+  "source_commit": "5bdbc9dab6fdfa7a73aebc254b40ac42e9fd5076",
+  "installer_sha256": "7d23702a81a4e2ca06f28da8c1fee0a980f52389bdefb95c7516d307eac025d2",
+  "environment": "Windows 11 Pro x64 Hyper-V lab, existing prerequisites",
+  "signature": {"status": "Valid", "trust": "private_owner_managed_not_public"},
+  "installer_exit_code": 0,
+  "installer_task_state": "Ready",
+  "installation_status": "completed",
+  "backend_version": "2.696.0",
+  "backend_status": "ok",
+  "frontend_http_status": 200,
+  "searxng_result_count": 69,
+  "searxng_engine_count": 80,
+  "libreoffice_version": "26.2.5.2",
+  "local_agent_status": "degraded_no_qualified_model",
+  "cloud_authentication_tested": false,
+  "fresh_os_prerequisite_uac_flow_certified": false,
+  "all_supported_windows_certified": false,
+  "business_user_data_included": false
+}

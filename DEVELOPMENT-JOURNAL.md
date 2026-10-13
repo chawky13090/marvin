@@ -1,5 +1,23 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — qualification réelle du dernier EXE signé après coupure réseau
+
+- Le paquet du commit 5bdbc9dab6fdfa7a73aebc254b40ac42e9fd5076 a été
+  transféré, son SHA-256 et sa signature privée ont été vérifiés dans la VM.
+  Le rejeu utilise l'EXE livré, sans patch du paquet extrait.
+- Résultat observé : état completed, tâche Ready, code de sortie 0;
+  backend v2.696.0 ok, frontend HTTP 200, recherche SearXNG 69 résultats
+  et 80 moteurs, LibreOffice 26.2.5.2 confirmé.
+- Limites conservées : aucun agent local qualifié dans cette VM, aucune
+  authentification Cloud testée; les prérequis système étaient déjà présents.
+  Ce run prouve la mise à niveau signée, pas l'ensemble du parcours UAC
+  depuis un Windows vierge ni toutes les éditions/machines Windows.
+- Preuve minimisée : benchmarks/windows-operator/installer-v2696-signed-vm-result.json.
+  Aucun secret, texte de conversation ou identifiant de session n'y figure.
+  Aucun changement produit ni migration dans cette publication.
+- Les échecs précédents restent conservés. Rollback : réversion du commit
+  de publication; la VM conserve ses sauvegardes de code pour le rollback runtime.
+
 ## 2026-10-13 — l'installation termine sans attendre les serveurs descendants
 
 - Le processus installateur utilisait `Start-Process -Wait`, qui attend sous
