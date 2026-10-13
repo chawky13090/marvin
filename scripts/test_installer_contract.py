@@ -101,6 +101,9 @@ def _assert_static_contract() -> None:
     for token in required_installer_tokens:
         assert token in installer, token
     assert "num_ctx" not in installer
+    assert 'runtime\\install\\package.json' in starter
+    assert 'call npm run start' in starter
+    assert '.next\\BUILD_ID' in starter
     assert "Invoke-InstallStage -Name 'libreoffice_required' -Action" in installer
     assert "$DeploymentProfile -eq 'Full' -or -not $SkipOptional" in installer
     assert "libreoffice_optional" not in installer

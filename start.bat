@@ -205,7 +205,15 @@ if "%STOP_REQUESTED%"=="true" (
     popd
     exit /b 0
 )
-call npm run dev
+if exist "%~dp0runtime\install\package.json" (
+    if not exist "%~dp0.next\BUILD_ID" (
+        echo [ERREUR] Build de production absent. Relancez INSTALLER-MARVIN.bat.
+        goto :startup_error
+    )
+    call npm run start
+) else (
+    call npm run dev
+)
 set "FRONTEND_RC=%ERRORLEVEL%"
 popd
 exit /b %FRONTEND_RC%

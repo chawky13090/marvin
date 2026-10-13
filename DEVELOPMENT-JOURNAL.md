@@ -1,5 +1,22 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — v2.696.0 — démarrage distribué en production
+
+- Diagnostic : le frontend de l'installation restaurée utilisait `next dev`.
+  La première compilation à la demande retardait l'obtention d'un HTTP 200.
+- Correction : présence de `runtime/install/package.json` implique `npm run start`;
+  un BUILD_ID absent produit une erreur explicite. Le checkout conserve le mode dev.
+- Validation réelle VM : build Next.js 16.2.12 code 0, BUILD_ID présent, lancement
+  `next start -H 127.0.0.1`, Ready en 15,9 s, frontend HTTP 200 et backend sain
+  avec 364 outils. Le test a appliqué le lanceur corrigé à une installation v2.695;
+  il ne constitue pas encore un cycle d'installation signé complet v2.696.
+- Tests architecture, contrat installateur et readiness réussis.
+- La VM a temporairement un plafond mémoire de 8 Gio au lieu de 6 Gio; le
+  profil initial 3/4/6 Gio reste connu et sera restauré après qualification.
+- Surface : aucun endpoint, secret, autorisation ou contenu utilisateur modifié.
+  Les deux serveurs restent sur loopback. Les logs existants sont conservés.
+- Rollback code : réversion atomique de v2.696. Aucun schéma ou contenu migré.
+
 ## 2026-10-13 — état de qualification après installation LibreOffice
 
 - Le rejeu signé depuis `2b58ce7` a échoué sur SearXNG pendant une panne
