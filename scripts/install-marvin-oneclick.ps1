@@ -600,13 +600,13 @@ try {
         $StageResults['local_models_and_context'] = [ordered]@{ status = 'skipped'; reason = 'SkipModels explicite' }
     }
 
-    if (-not $SkipOptional) {
-        Invoke-InstallStage -Name 'libreoffice_optional' -Optional -Action {
+    if ($DeploymentProfile -eq 'Full' -or -not $SkipOptional) {
+        Invoke-InstallStage -Name 'libreoffice_required' -Action {
             & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'manage-libreoffice.ps1') -Action Ensure
-            if ($LASTEXITCODE -ne 0) { throw 'LibreOffice indisponible; validation documentaire structurelle maintenue.' }
+            if ($LASTEXITCODE -ne 0) { throw 'LibreOffice obligatoire non qualifie; installation interrompue.' }
         }
     } else {
-        $StageResults['libreoffice_optional'] = [ordered]@{ status = 'skipped'; reason = 'SkipOptional explicite' }
+        $StageResults['libreoffice_required'] = [ordered]@{ status = 'skipped'; reason = 'Profil Core et SkipOptional explicites' }
     }
 
     Invoke-InstallStage -Name 'production_build' -Action {

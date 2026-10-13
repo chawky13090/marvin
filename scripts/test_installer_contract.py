@@ -101,6 +101,9 @@ def _assert_static_contract() -> None:
     for token in required_installer_tokens:
         assert token in installer, token
     assert "num_ctx" not in installer
+    assert "Invoke-InstallStage -Name 'libreoffice_required' -Action" in installer
+    assert "$DeploymentProfile -eq 'Full' -or -not $SkipOptional" in installer
+    assert "libreoffice_optional" not in installer
     assert "C:\\Users\\Chawb" not in installer
     assert "Invoke-WebRequest -Uri $Url" in installer
     assert "for ($Attempt = 1; $Attempt -le 3" in installer

@@ -1,5 +1,24 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — LibreOffice obligatoire dans le profil Full
+
+- Demande propriétaire : LibreOffice est obligatoire. Le profil Full traite
+  désormais cette étape comme bloquante, même avec `SkipOptional`; le profil
+  Core reste explicitement réduit.
+- Cause établie du blocage VM : le journal Winget s'arrête sur le lancement
+  du redistribuable Visual C++ système après vérification de son empreinte.
+  L'installation demande désormais une élévation UAC explicite pour Winget;
+  la vérification `soffice` reste dans le compte propriétaire.
+- Contrat : LibreOffice absent, timeout, refus UAC ou vérification échouée
+  interdisent le succès du profil Full. La borne de 900 secondes est conservée.
+- Sécurité : élévation limitée à l'installation du composant; aucun secret
+  n'est fourni par Marvin. Aucun reçu d'installation n'est confondu avec
+  la vérification de fonctionnement.
+- Validation : tests installateur et timeout requis avant intégration;
+  nouvelle qualification VM nécessaire avant livraison du paquet.
+- Rollback : réversion atomique de cette modification; LibreOffice installé
+  est un composant partagé et ne sera pas supprimé automatiquement.
+
 ## 2026-10-13 — qualification Full interrompue sur LibreOffice
 
 - Résultat observé du paquet v2.695 : Docker/SearXNG réussis en 21 927 ms;

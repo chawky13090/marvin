@@ -4,5 +4,6 @@
   "version": "26.2.5.2",
   "publisher": "The Document Foundation",
   "required_for": ["docx_visual_validation", "office_pdf_conversion"],
-  "core_required": false
+  "core_required": false,
+  "full_required": true
 }

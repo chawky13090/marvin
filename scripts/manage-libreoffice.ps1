@@ -91,7 +91,10 @@ if ($Action -eq 'Ensure') {
                 '--version', [string]$Manifest.version, '--source', 'winget', '--silent',
                 '--disable-interactivity', '--accept-source-agreements', '--accept-package-agreements'
             )
-            $Process = Start-Process -FilePath $Winget.Source -ArgumentList $Arguments -PassThru -WindowStyle Hidden
+            # Les dépendances VC++ et le MSI LibreOffice sont des composants
+            # système. Demander l'UAC ici évite une attente invisible dans un
+            # désinstalleur enfant lancé depuis un compte standard.
+            $Process = Start-Process -FilePath $Winget.Source -ArgumentList $Arguments -Verb RunAs -PassThru
             Wait-LibreOfficeOperation $Process
             if ($Process.ExitCode -notin @(0, -1978335189)) {
                 throw "WinGet a échoué avec le code $($Process.ExitCode)."
