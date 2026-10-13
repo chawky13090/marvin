@@ -1,5 +1,39 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — v2.699, prerequisites et retrait Docker fermés
+
+- La VM Win11 a montré un lanceur WSL sans runtime, malgré le probe ancien
+  code0/sortie non vide. Le nouveau probe exige la version WSL >=2.1.5;
+  tests aides/vide/versionancienne/anglais/français. Runtime Microsoft installé
+  ensuite en laboratoire; aucune sortie d'aide ne constitue désormais un ready.
+- Full : OS client/build compatible et mémoire physique >=8 000 000 000 octets
+  contrôlés avant téléchargement. Windows Server reste Core, pas Docker Desktop.
+  Référence officielle Docker Windows, vérifiée le 13/10 : WSL >=2.1.5,
+  Windows10 build19045/Windows11 build22631+, 8 GB RAM, hors Windows Server.
+- Moindre privilège : retrait du faux --user=nom (le flag Docker --user désigne
+  le mode per-user, pas un nom). Installation all-users explicite par défaut;
+  WSL 2 ne force plus docker-users/always-run-service; Hyper-V garde sa garde.
+  Aucun membre préexistant supprimé sur les postes propriétaires.
+- Désinstallation : au lieu d'un docker rm sans borne et sans preuve de cible,
+  endpoint Linux local explicite, 30 s, bind interne requis, volume/voisin refusés.
+  Les inspections ambiguës stoppent avant déplacement/suppression des données.
+  Pas de factory reset ou de suppression de volumes Docker.
+- Tests : probe WSL, politique privilèges et ownership bind positif/négatifs
+  intégrés au contrat installateur. Le gate rapide n'est pas lancé pendant la VM
+  active : son environnement E7 doit être restauré après cette campagne.
+- Laboratoire seulement : session console temporaire via secret LSA protégé
+  (méthode Microsoft), jamais DefaultPassword en clair dans Winlogon. Secret retiré
+  après chaque connexion, comptes/mots de passe inchangés. Aucun dispositif ajouté
+  à l'installeur produit. Tous les prérequis élevés sont séparés des tests UAC.
+- Le profil mémoire du laboratoire passe temporairement à 8 Gio fixes pour Full,
+  puis doit revenir à 3/4/6 dynamique et VM Off avant qualification E7 finale.
+- Logs : événements existants d'installation conservés, diagnostic WSL borné et
+  lignes sensibles exclues; sorties Docker locales temporaires supprimées.
+  Aucune nouvelle donnée personnelle ni secret durable produit.
+- Rollback code par réversion du commit. Les composants système du laboratoire
+  sont réversibles via Marvin-Clean; sur un poste destinataire, ne pas désinstaller
+  WSL/Docker partagés automatiquement. Pas de migration destructive ni de donnée hôte.
+
 ## 2026-10-13 — Office direct, rejeu séquentiel du code courant réussi
 
 - Après désinstallation confirmée et fin de tous les moniteurs, nouveau dossier

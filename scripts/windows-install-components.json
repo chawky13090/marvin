@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "minimum_windows_build": 17763,
+  "minimum_full_memory_bytes": 8000000000,
   "minimum_free_bytes": 42949672960,
   "resume_minimum_free_bytes": 17179869184,
   "python": {

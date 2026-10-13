@@ -13,6 +13,7 @@ function Invoke-WslBounded {
     $Stderr = [IO.Path]::GetTempFileName()
     try {
         $Process = Start-Process -FilePath 'wsl.exe' -ArgumentList $Arguments -PassThru -WindowStyle Hidden -RedirectStandardOutput $Stdout -RedirectStandardError $Stderr
+        $null = $Process.Handle
         if (-not $Process.WaitForExit($TimeoutSeconds * 1000)) {
             & taskkill.exe /PID $Process.Id /T /F 2>$null | Out-Null
             return [ordered]@{ exit_code = 124; output = 'timeout' }
@@ -26,6 +27,15 @@ function Invoke-WslBounded {
     } finally {
         Remove-Item -LiteralPath $Stdout, $Stderr -Force -ErrorAction SilentlyContinue
     }
+}
+
+function Test-WslVersionResult($Result) {
+    if ([int]$Result.exit_code -ne 0) { return $false }
+    # Le lanceur Windows peut afficher une aide d'installation et retourner 0.
+    # Seule la ligne de version WSL (anglais/francais et autres locales) est recevable.
+    $Match = [regex]::Match([string]$Result.output, '(?im)^[^\r\n]*(?<![A-Za-z])WSL(?![A-Za-z])[^\r\n:]*:\s*(\d+\.\d+\.\d+(?:\.\d+)?)')
+    if (-not $Match.Success) { return $false }
+    return [version]$Match.Groups[1].Value -ge [version]'2.1.5'
 }
 
 $Identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -64,11 +74,13 @@ if ($Pending) {
     exit 3010
 }
 $Version = Invoke-WslBounded -Arguments @('--version') -TimeoutSeconds 30
-if ([int]$Version.exit_code -ne 0 -or [string]::IsNullOrWhiteSpace([string]$Version.output)) {
+if (-not (Test-WslVersionResult $Version)) {
     if ($PSCmdlet.ShouldProcess('WSL', 'Installer le runtime sans distribution Linux')) {
         $Install = Invoke-WslBounded -Arguments @('--install', '--no-distribution', '--web-download') -TimeoutSeconds 600
         if ([int]$Install.exit_code -notin @(0, 3010)) {
-            throw "Installation du runtime WSL echouee avec le code $($Install.exit_code)."
+            $Detail = (([string]$Install.output -split '\r?\n' | Where-Object {$_ -notmatch '(?i)token|password|secret|cookie|authorization|[?&](sig|se|sv|sp)='}) -join ' ')
+            if ($Detail.Length -gt 1500) { $Detail = $Detail.Substring(0,1500) }
+            throw "Installation du runtime WSL echouee avec le code $($Install.exit_code): $Detail"
         }
     }
     Write-Output 'Runtime WSL installe; redemarrage Windows requis.'

@@ -28,6 +28,10 @@ function Resolve-DockerCli {
     return ''
 }
 
+function Test-DockerPrivilegedAccessRequired([string]$SelectedBackend) {
+    return $SelectedBackend -eq 'hyper-v'
+}
+
 function Test-DockerEngine([string]$DockerPath) {
     if ([string]::IsNullOrWhiteSpace($DockerPath)) { return $false }
     $Out = [IO.Path]::GetTempFileName()
@@ -48,7 +52,7 @@ function Test-DockerEngine([string]$DockerPath) {
 
 function Ensure-CurrentUserDockerAccess {
     $TargetUser = [Environment]::UserName
-    if ($TargetUser -notmatch '^[A-Za-z0-9._-]{1,64}$') { throw 'Nom utilisateur Windows non admissible pour Docker Desktop.' }
+    if ($TargetUser -notmatch '^[A-Za-z0-9._-]{1,64}$') { throw 'Nom utilisateur Windows non admissible pour l attribution Hyper-V.' }
     $Group = Get-LocalGroup -Name 'docker-users' -ErrorAction Stop
     $User = Get-LocalUser -Name $TargetUser -ErrorAction Stop
     $Member = Get-LocalGroupMember -Group $Group -ErrorAction Stop |
@@ -99,7 +103,7 @@ if ($NeedsWslBootstrap -and -not $Plan) {
     }
     if ([int]$PrerequisiteProcess.ExitCode -ne 0) { throw "Activation des prerequis WSL 2 echouee avec le code $($PrerequisiteProcess.ExitCode)." }
 }
-if (-not [string]::IsNullOrWhiteSpace($DockerCli) -and -not $Plan) {
+if (-not [string]::IsNullOrWhiteSpace($DockerCli) -and -not $Plan -and (Test-DockerPrivilegedAccessRequired $SelectedBackend)) {
     Ensure-CurrentUserDockerAccess
 }
 
@@ -116,17 +120,20 @@ if ([string]::IsNullOrWhiteSpace($DockerCli)) {
     }
     if (-not $PSCmdlet.ShouldProcess('Docker Desktop', "Installer avec le backend $SelectedBackend")) { exit 2 }
     $TargetUser = [Environment]::UserName
-    if ($TargetUser -notmatch '^[A-Za-z0-9._-]{1,64}$') { throw 'Nom utilisateur Windows non admissible pour Docker Desktop.' }
-    $Arguments = @('install', '--quiet', '--accept-license', "--backend=$SelectedBackend", "--user=$TargetUser", '--always-run-service', '--no-windows-containers')
+    if ((Test-DockerPrivilegedAccessRequired $SelectedBackend) -and $TargetUser -notmatch '^[A-Za-z0-9._-]{1,64}$') { throw 'Nom utilisateur Windows non admissible pour l attribution Hyper-V.' }
+    $Arguments = @('install', '--quiet', '--accept-license', "--backend=$SelectedBackend", '--no-windows-containers')
+    if (Test-DockerPrivilegedAccessRequired $SelectedBackend) { $Arguments += '--always-run-service' }
     $Process = Start-Process -FilePath $InstallerPath -ArgumentList $Arguments -Verb RunAs -Wait -PassThru
     if ([int]$Process.ExitCode -notin @(0, 3010)) { throw "Docker Desktop a retourne le code $($Process.ExitCode)." }
-    $GrantScript = Join-Path $PSScriptRoot 'grant-docker-user-access.ps1'
-    if (-not (Test-Path -LiteralPath $GrantScript -PathType Leaf)) { throw 'Script de moindre privilege Docker absent.' }
-    $GrantProcess = Start-Process -FilePath 'powershell.exe' -Verb RunAs -Wait -PassThru -ArgumentList @(
-        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $GrantScript),
-        '-TargetUser', $TargetUser
-    )
-    if ([int]$GrantProcess.ExitCode -ne 0) { throw "Attribution de l acces Docker a retourne le code $($GrantProcess.ExitCode)." }
+    if (Test-DockerPrivilegedAccessRequired $SelectedBackend) {
+        $GrantScript = Join-Path $PSScriptRoot 'grant-docker-user-access.ps1'
+        if (-not (Test-Path -LiteralPath $GrantScript -PathType Leaf)) { throw 'Script de moindre privilege Docker absent.' }
+        $GrantProcess = Start-Process -FilePath 'powershell.exe' -Verb RunAs -Wait -PassThru -ArgumentList @(
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $GrantScript),
+            '-TargetUser', $TargetUser
+        )
+        if ([int]$GrantProcess.ExitCode -ne 0) { throw "Attribution de l acces Docker a retourne le code $($GrantProcess.ExitCode)." }
+    }
     if ([int]$Process.ExitCode -eq 3010) {
         Write-Output 'Docker Desktop est installe mais Windows doit redemarrer avant la qualification du profil Full.'
         exit 3010
@@ -134,8 +141,12 @@ if ([string]::IsNullOrWhiteSpace($DockerCli)) {
     # Le jeton du compte proprietaire precede son ajout au groupe docker-users.
     # La reprise de l installateur apres redemarrage qualifiera le moteur avec
     # un nouveau jeton et ne contournera jamais ce controle d acces.
-    Write-Output 'Docker Desktop est installe. Windows doit redemarrer afin d activer l acces du proprietaire au moteur.'
-    exit 3010
+    if (Test-DockerPrivilegedAccessRequired $SelectedBackend) {
+        Write-Output 'Docker Desktop est installe. Reconnexion requise pour les droits Hyper-V du proprietaire.'
+        exit 3010
+    }
+    $DockerCli = Resolve-DockerCli
+    if ([string]::IsNullOrWhiteSpace($DockerCli)) { throw 'CLI Docker absent apres installation; qualification refusee.' }
 }
 
 $Desktop = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'

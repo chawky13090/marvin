@@ -10,6 +10,40 @@ $ProjectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $Marker = Join-Path $ProjectRoot 'runtime\install\state.json'
 $PackageMetadata = Join-Path $ProjectRoot 'runtime\install\package.json'
 $LocalAppData = [IO.Path]::GetFullPath([Environment]::GetFolderPath('LocalApplicationData'))
+
+function Test-UninstallContainerOwnership([object[]]$Mounts, [string]$Root) {
+    $Prefix = $Root.TrimEnd('\') + '\'
+    foreach ($Mount in $Mounts) {
+        if ([string]$Mount.Type -ne 'bind') { continue }
+        $Source = [string]$Mount.Source
+        if ($Source.Equals($Root,[StringComparison]::OrdinalIgnoreCase) -or $Source.StartsWith($Prefix,[StringComparison]::OrdinalIgnoreCase)) { return $true }
+    }
+    return $false
+}
+
+function Read-UninstallContainerInspection([string]$Output) {
+    $Parts=$Output.Trim() -split '\|',2
+    if($Parts.Count -ne 2 -or $Parts[0] -notmatch '^[a-f0-9]{64}$') { throw 'Identite de conteneur non confirmee.' }
+    return [pscustomobject]@{id=$Parts[0];mounts=@($Parts[1]|ConvertFrom-Json)}
+}
+
+function Invoke-UninstallDocker([string[]]$Arguments) {
+    $Docker=Join-Path $env:ProgramFiles 'Docker\Docker\resources\bin\docker.exe'
+    $Out=[IO.Path]::GetTempFileName();$Err=[IO.Path]::GetTempFileName();$Process=$null
+    try {
+        $Process=Start-Process $Docker -ArgumentList (@('--host','npipe:////./pipe/dockerDesktopLinuxEngine')+$Arguments) -PassThru -WindowStyle Hidden -RedirectStandardOutput $Out -RedirectStandardError $Err
+        $null=$Process.Handle
+        if(-not $Process.WaitForExit(30000)){
+            & taskkill.exe /PID $Process.Id /T /F 2>$null | Out-Null
+            throw 'Operation Docker non confirmee; desinstallation suspendue sans suppression de donnees.'
+        }
+        $Process.WaitForExit()
+        return [pscustomobject]@{exit_code=[int]$Process.ExitCode;output=[IO.File]::ReadAllText($Out);error=[IO.File]::ReadAllText($Err)}
+    } finally {
+        if($Process){$Process.Dispose()}
+        Remove-Item -LiteralPath $Out,$Err -Force
+    }
+}
 if (-not (Test-Path -LiteralPath $Marker -PathType Leaf)) { throw 'Marqueur d installation Marvin absent; suppression automatique refusee.' }
 if ($ProjectRoot -eq [IO.Path]::GetPathRoot($ProjectRoot) -or $ProjectRoot.Length -lt ($LocalAppData.Length + 4)) {
     throw 'Racine Marvin dangereuse; suppression refusee.'
@@ -41,8 +75,22 @@ Unregister-ScheduledTask -TaskName 'Marvin - Demarrage automatique' -Confirm:$fa
 foreach ($Name in @('Marvin - Frontend', 'Marvin - Backend', 'Marvin - HTTPS')) {
     Get-NetFirewallRule -DisplayName $Name -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction SilentlyContinue
 }
-if (-not $KeepSearXngContainer -and (Get-Command docker.exe -ErrorAction SilentlyContinue)) {
-    & docker.exe rm -f marvin-searxng 2>$null | Out-Null
+if (-not $KeepSearXngContainer -and (Test-Path (Join-Path $ProjectRoot 'docker\searxng\settings.yml')) -and
+    (Test-Path (Join-Path $env:ProgramFiles 'Docker\Docker\resources\bin\docker.exe'))) {
+    $Inspection=Invoke-UninstallDocker @('inspect','--format','"{{.Id}}|{{json .Mounts}}"','marvin-searxng')
+    if ($Inspection.exit_code -ne 0 -and $Inspection.error -notmatch '(?i)no such (object|container).*marvin-searxng') {
+        throw 'Inspection Docker non confirmee; verifier le moteur avant de desinstaller.'
+    }
+    if ($Inspection.exit_code -eq 0 -and [string]::IsNullOrWhiteSpace($Inspection.output)) {
+        throw 'Inspection Docker vide; aucune absence de conteneur supposee.'
+    }
+    if ($Inspection.exit_code -eq 0) {
+        $Container=Read-UninstallContainerInspection $Inspection.output
+        if (Test-UninstallContainerOwnership $Container.mounts $ProjectRoot) {
+            $Removed=Invoke-UninstallDocker @('rm','-f',$Container.id)
+            if($Removed.exit_code -ne 0){throw 'Conteneur gere non retire; desinstallation interrompue sans suppression de donnees.'}
+        }
+    }
 }
 foreach ($Shortcut in @('Marvin.lnk', 'Desinstaller Marvin.lnk')) {
     Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::DesktopDirectory)) $Shortcut) -Force -ErrorAction SilentlyContinue

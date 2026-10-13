@@ -404,6 +404,15 @@ try {
         if ([int]$Os.BuildNumber -lt [int]$Components.minimum_windows_build) {
             throw "Build Windows $($Os.BuildNumber) non supporte; minimum $($Components.minimum_windows_build)."
         }
+        if ($DeploymentProfile -eq 'Full') {
+            if ([int]$Os.ProductType -ne 1) { throw 'Docker Desktop ne prend pas en charge Windows Server; profil Full refuse, Core reste disponible.' }
+            $MinimumFullBuild = if ([int]$Os.BuildNumber -ge 22000) { 22631 } else { 19045 }
+            if ([int]$Os.BuildNumber -lt $MinimumFullBuild) { throw "Profil Full : build Windows $MinimumFullBuild minimum requis pour Docker Desktop." }
+            $System = Get-CimInstance Win32_ComputerSystem
+            if ([uint64]$System.TotalPhysicalMemory -lt [uint64]$Components.minimum_full_memory_bytes) {
+                throw 'Profil Full : 8 Go de RAM physique minimum requis pour Docker Desktop; Core reste selectionnable explicitement.'
+            }
+        }
         $Drive = Get-PSDrive -Name ([IO.Path]::GetPathRoot($ProjectRoot).Substring(0, 1))
         $RequiredFreeBytes = Get-MinimumFreeBytesForCurrentRun
         if ([uint64]$Drive.Free -lt $RequiredFreeBytes) {

@@ -34,6 +34,8 @@ def _run_powershell(script: Path, *arguments: str) -> subprocess.CompletedProces
 
 
 def _assert_static_contract() -> None:
+    wsl_probe = _run_powershell(ROOT / 'scripts' / 'test_wsl_runtime_probe.ps1')
+    assert wsl_probe.returncode == 0, wsl_probe.stdout + wsl_probe.stderr
     launcher = (ROOT / "INSTALLER-MARVIN.bat").read_text(encoding="utf-8")
     compatibility = (ROOT / "INSTALLER-NOUVEAU-PC.bat").read_text(encoding="utf-8")
     legacy_bat = (ROOT / "install.bat").read_text(encoding="utf-8")
@@ -125,7 +127,9 @@ def _assert_static_contract() -> None:
     docker_wsl = (ROOT / "scripts" / "enable-docker-wsl-prerequisites.ps1").read_text(encoding="utf-8")
     assert "--accept-license" in docker_installer
     assert "--always-run-service" in docker_installer
-    assert '"--user=$TargetUser"' in docker_installer
+    assert '"--user=$TargetUser"' not in docker_installer
+    assert "Test-DockerPrivilegedAccessRequired $SelectedBackend" in docker_installer
+    assert components["minimum_full_memory_bytes"] == 8_000_000_000
     assert "grant-docker-user-access.ps1" in docker_installer
     assert "Add-LocalGroupMember" in docker_grant
     assert "Get-LocalGroupMember" in docker_grant
