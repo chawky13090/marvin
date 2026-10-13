@@ -1,5 +1,17 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — documentation de livraison Full/Core et signature privée
+
+- INSTALLATION.md conservait les versions et contrats de v2.657. Mise à jour
+  vers v2.697, construction boutique EXE/ZIP, fichiers publics de confiance,
+  absence de clés privées transférées, distinction Full obligatoire/Core explicite.
+- Les limites de VM, Cloud et élévation restent écrites; aucun résultat de
+  mise à niveau n'est présenté comme certification Windows vierge universelle.
+  La reprise 3010 et les limites du rollback de données sont explicites.
+- Test documentation baseline exécuté et réussi; git diff --check réussi.
+  Aucun changement runtime, donnée, réseau, secret ou journalisation produit.
+  Rollback par réversion atomique de ce changement documentaire.
+
 ## 2026-10-13 — v2.697, qualification Core interrompue au preflight disque
 
 - Nouveau dossier cible dans la VM, compte standard par PowerShell Direct,
