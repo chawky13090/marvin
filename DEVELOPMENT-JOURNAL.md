@@ -1,5 +1,24 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — v2.697, reprise du paquet après redémarrage requis
+
+- Analyse : restaurer l'ancien code sur tout retour non nul détruit la cible
+  du RunOnce lorsque Docker exige un redémarrage (3010). Retenu : préserver
+  le code installé uniquement pour 3010 et propager le statut; les véritables
+  erreurs gardent la restauration de sauvegarde. Aucun timeout augmenté.
+- Modifiés : lanceur PowerShell de paquet, lanceur BAT, test d'intégration
+  et métadonnées de version. Test exécuté : installation simulée retournant
+  3010, nouveau code et données préservés, anciennes erreurs toujours compensées.
+- Journalisation : l'événement structuré restart_required existe déjà dans
+  install-marvin-oneclick; pas de nouveau magasin ni événement nécessaire.
+  Le lanceur affiche seulement un diagnostic générique, sans secret; rotation
+  et rétention de l'installateur inchangées. Aucun nouvel accès réseau ou privilège.
+- Rollback : réversion atomique du commit avant distribution. Pour une installation
+  réellement en attente, ne pas réverter le code cible du RunOnce; terminer ou
+  annuler explicitement la reprise avant restauration de l'ancien paquet.
+- Limite : preuve intégrée du code de retour, pas encore une preuve de premier
+  démarrage Windows vierge avec interaction UAC et reboot Docker.
+
 ## 2026-10-13 — qualification réelle du dernier EXE signé après coupure réseau
 
 - Le paquet du commit 5bdbc9dab6fdfa7a73aebc254b40ac42e9fd5076 a été

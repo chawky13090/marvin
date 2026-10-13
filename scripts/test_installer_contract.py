@@ -463,6 +463,17 @@ def _assert_package_install_and_rollback_support_spaces() -> None:
         assert (target / "version-marker.txt").read_text(encoding="utf-8") == "stable"
         assert data_marker.read_text(encoding="utf-8") == "preserved"
 
+        _write_fake_package(package, "4" * 40, "pending-restart", 3010)
+        pending = _run_powershell(
+            package / "install-marvin-package.ps1",
+            "-InstallRoot", str(target), "-NoStart", "-SkipModels", "-SkipOptional",
+        )
+        assert pending.returncode == 3010, pending.stdout + pending.stderr
+        assert (target / "version-marker.txt").read_text(encoding="utf-8") == "pending-restart"
+        assert data_marker.read_text(encoding="utf-8") == "preserved"
+        launcher = (ROOT / "scripts" / "package-installer-launcher.bat").read_text(encoding="utf-8")
+        assert launcher.index('if "%RESULT%"=="3010"') < launcher.index('if not "%RESULT%"=="0"')
+
 
 def _assert_package_finishes_with_runtime_child_alive() -> None:
     import psutil

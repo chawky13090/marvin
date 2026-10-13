@@ -201,6 +201,11 @@ try {
     # installateur permet au paquet de terminer en laissant Marvin actif.
     $Process = Start-Process -FilePath 'powershell.exe' -ArgumentList $Arguments -WorkingDirectory $InstallRoot -PassThru
     $Process.WaitForExit()
+    if ($Process.ExitCode -eq 3010) {
+        # Le RunOnce vise le nouveau code : ne pas restaurer l'ancien dossier.
+        Write-Host 'Redemarrage Windows requis; installation conservee pour reprise automatique.' -ForegroundColor Yellow
+        exit 3010
+    }
     if ($Process.ExitCode -ne 0) {
         if (Test-Path -LiteralPath $Backup) { Restore-PreviousInstall }
         throw "L installation des composants Marvin a echoue (code $($Process.ExitCode))."
