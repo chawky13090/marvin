@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "observed_on": "2026-10-13",
+  "installer_backend": "Direct",
+  "action": "Uninstall",
+  "product_code": "{3B467719-C25B-478C-8F4C-8E2EDA0E2093}",
+  "elevated_lab_identity": true,
+  "interactive_uac_tested": false,
+  "winget_invoked": false,
+  "exit_code": 0,
+  "libreoffice_status_after": "unavailable",
+  "libreoffice_executable_after": null,
+  "vc_runtime_removed": false,
+  "host_data_modified": false,
+  "full_installer_certified": false
+}

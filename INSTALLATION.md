@@ -2,7 +2,7 @@
 
 Cible technique : socle Windows x64 build 17763+; profil Full à qualifier sur une édition compatible Docker Desktop
 
-Versions épinglées : Marvin 2.697.0, Python 3.13.15, Node.js 24.19.0, Ollama 0.32.11, Docker Desktop 4.94.0, LibreOffice 26.2.5.2
+Versions épinglées : Marvin 2.698.0, Python 3.13.15, Node.js 24.19.0, Ollama 0.32.11, Docker Desktop 4.94.0, LibreOffice 26.2.5.2
 
 Niveau requis : utilisateur Windows standard; administrateur pour les composants système exigés par Full
 
@@ -55,10 +55,10 @@ donc pas embarquer `data`, `.env.local`, `.venv`, `node_modules`, `.next`, cache
 fichiers non suivis. Les fichiers versionnés produits comprennent :
 
 ```text
-dist\Marvin-Windows-v2.697.0.zip
-dist\Marvin-Windows-v2.697.0.zip.sha256
-dist\Marvin-Setup-Private-v2.697.0.exe
-dist\Marvin-Setup-Private-v2.697.0.exe.sha256
+dist\Marvin-Windows-v2.698.0.zip
+dist\Marvin-Windows-v2.698.0.zip.sha256
+dist\Marvin-Setup-Private-v2.698.0.exe
+dist\Marvin-Setup-Private-v2.698.0.exe.sha256
 ```
 
 ## 2. Transférer et vérifier
@@ -79,7 +79,7 @@ La vérification manuelle du ZIP est recommandée :
 # Privileges: Utilisateur
 # Objective: vérifier l'intégrité du paquet avant extraction
 
-$zip = '.\Marvin-Windows-v2.697.0.zip'
+$zip = '.\Marvin-Windows-v2.698.0.zip'
 Get-FileHash -LiteralPath $zip -Algorithm SHA256
 Get-Content -LiteralPath ($zip + '.sha256')
 ```
@@ -90,7 +90,7 @@ SHA-256 du payload interne avant toute publication dans la cible.
 ## 3. Installer
 
 1. Extraire entièrement le ZIP dans un dossier local.
-2. Ouvrir le dossier `Marvin-Windows-v2.697.0` extrait.
+2. Ouvrir le dossier `Marvin-Windows-v2.698.0` extrait.
 3. Double-cliquer sur `INSTALLER-MARVIN.bat`.
 4. Laisser la fenêtre ouverte jusqu'à `INSTALLATION TERMINEE`.
 
@@ -113,6 +113,14 @@ Les téléchargements sont repris par relance du même fichier après un inciden
 conservés pendant un échec, puis supprimés après réussite. Aucun modèle local fixe n'est imposé :
 le portefeuille est choisi selon CPU, RAM, VRAM et métadonnées du modèle. Aucun `num_ctx` n'est
 envoyé à un modèle Cloud.
+
+Si WinGet manque, LibreOffice utilise un MSI x64 et son prérequis VC++ épinglés,
+depuis les éditeurs, avec SHA-256 vérifié. Le mode `-InstallerBackend Direct`
+de `scripts\manage-libreoffice.ps1` permet aussi de sélectionner ce chemin.
+L'élévation UAC reste explicite; un refus n'est jamais contourné. Le code 3010
+conserve l'installation pour reprise. Téléchargement borné à 300 s et 512 Mio;
+opérations natives bornées à 900 s. Un timeout peut laisser une opération élevée
+active : vérifier l'inventaire avant toute nouvelle tentative.
 
 ### Activer Ollama Cloud sur le poste cible
 
@@ -145,7 +153,7 @@ Double-cliquer sur `VERIFIER-INSTALLATION.bat`. Les fichiers de diagnostic sont 
 | Capacités | `data\install-capabilities.json` | disponible/dégradé/indisponible et remédiation | dernière détection |
 | Profil Ollama | `data\install\ollama-context-profile.json` | contexte local réellement qualifié | recalibré si matériel/modèle change |
 
-Résultats du socle : backend `status=ok`, version 2.697.0, 364 outils, frontend HTTP 200.
+Résultats du socle : backend `status=ok`, version 2.698.0, 364 outils, frontend HTTP 200.
 Full exige en plus Docker/SearXNG et LibreOffice qualifiés. Un agent local non qualifié
 ou une identité Cloud absente ne constitue pas une preuve de chat IA opérationnel.
 Les tests doivent distinguer installation, interface et réussite d'une demande IA réelle.

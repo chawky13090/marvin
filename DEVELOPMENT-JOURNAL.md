@@ -1,5 +1,14 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — rollback réel Office direct
+
+- Le produit installé uniquement pour le test a été retiré par Action Uninstall,
+  InstallerBackend Direct, ProductCode épinglé. Résultat : code 0, rapport
+  unavailable, aucun exécutable Office trouvé. VC++ partagé conservé.
+- Preuve séparée installer-v2698-office-direct-rollback.json. Pas de réécriture
+  du résultat d'installation ni suppression d'historique utilisateur.
+  Le compte admin qualifie l'effet, pas l'interaction UAC d'un compte standard.
+
 ## 2026-10-13 — résultat réel Office direct avec streaming corrigé
 
 - Renforcement supplémentaire : chaque attente async est bornée par le temps
