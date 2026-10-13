@@ -3,6 +3,8 @@ param(
     [ValidateSet('Status', 'Ensure', 'Verify', 'Uninstall')]
     [string]$Action = 'Status',
     [string]$ResultPath = '',
+    [ValidateSet('Auto', 'Direct')]
+    [string]$InstallerBackend = 'Auto',
     [ValidateRange(30, 3600)]
     [int]$OperationTimeoutSeconds = 900
 )
@@ -162,7 +164,7 @@ function Invoke-DirectOfficeRemoval([string]$ProductCode) {
 if ($Action -eq 'Ensure') {
     $Before = Get-LibreOfficeStatus
     if (-not $Before.verified) {
-        $Winget = Get-Command winget.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+        $Winget = if ($InstallerBackend -eq 'Auto') { Get-Command winget.exe -ErrorAction SilentlyContinue | Select-Object -First 1 } else { $null }
         if (-not $Winget) {
             if ($PSCmdlet.ShouldProcess(([string]$Manifest.package_id), 'Installer LibreOffice et VC++ sans WinGet')) {
                 if (-not (Test-VcRuntime)) {
@@ -211,7 +213,7 @@ if ($Action -eq 'Ensure') {
 
 if ($Action -eq 'Uninstall') {
     if ($PSCmdlet.ShouldProcess(([string]$Manifest.package_id), 'Désinstaller LibreOffice')) {
-        $Winget = Get-Command winget.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+        $Winget = if ($InstallerBackend -eq 'Auto') { Get-Command winget.exe -ErrorAction SilentlyContinue | Select-Object -First 1 } else { $null }
         if (-not $Winget) {
             $RemovalCode=Invoke-DirectOfficeRemoval ([string]$Manifest.direct_msi.product_code)
             if ($RemovalCode -eq 3010) { $Status=Get-LibreOfficeStatus; $Status.reboot_required=$true; Save-Result $Status; exit 3010 }

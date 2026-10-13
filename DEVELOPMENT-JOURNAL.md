@@ -2,6 +2,12 @@
 
 ## 2026-10-13 — v2.698, provisionnement Office direct sans WinGet
 
+- Premier préflight du test élevé : WinGet est disponible pour le compte admin
+  du laboratoire, contrairement au compte standard. Aucun installateur n'a été
+  exécuté dans cette tentative. Ajout du choix explicite InstallerBackend=Direct
+  pour reproduire le chemin sans WinGet sans modifier le PATH ou les outils système.
+  Auto conserve le comportement par défaut; Direct utilise exactement le fallback.
+
 - Alternative retenue : fallback MSI/VC++ explicite, plutôt que réinstaller
   AppInstaller et dépendre de son activation par utilisateur. Aucun changement
   lorsque Office répond déjà ou lorsque WinGet est disponible.
