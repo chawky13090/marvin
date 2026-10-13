@@ -153,7 +153,9 @@ def test_launcher_forces_reload_and_checks_effective_config() -> None:
     resolver = RESOLVER_PATH.read_text(encoding="utf-8")
 
     assert "Set-StrictMode -Version Latest" in launcher
-    assert "docker compose up -d --remove-orphans" in launcher
+    assert "@('compose', 'up', '-d', '--remove-orphans')" in launcher
+    assert "Invoke-DockerComposeUp -DockerPath" in launcher
+    assert "$Process.WaitForExit(900000)" in launcher
     assert "MARVIN_SEARXNG_CONFIG_SHA256" in launcher
     assert "MARVIN_SETTINGS_SHA256" in compose
     assert "--force-recreate" not in launcher
@@ -163,7 +165,9 @@ def test_launcher_forces_reload_and_checks_effective_config() -> None:
     assert '$settingsPath + ".bak"' in launcher
     assert "resolve-searxng-port.ps1" in launcher
     assert "$env:SEARXNG_PORT" in launcher
-    assert "docker port marvin-searxng 8080/tcp" in launcher
+    assert "@('port', 'marvin-searxng', '8080/tcp')" in launcher
+    assert "Get-ExistingSearxngPort" in launcher
+    assert "$Process.WaitForExit(10000)" in launcher
     assert "$Process.WaitForExit()" in launcher
     assert "[System.IO.File]::ReadAllText($Stdout).Trim()" in launcher
     assert "$ServerVersion -match" in launcher

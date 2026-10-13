@@ -6,7 +6,7 @@
     "dev": "node scripts/start_next_dev.mjs",
     "avatar": "electron desktop-avatar/main.cjs",
     "build": "node scripts/build_next_safe.mjs",
-    "start": "next start -H 127.0.0.1",
+    "start": "node scripts/start_next_dev.mjs --production",
     "lint": "eslint",
     "check:runtime": "node scripts/check_runtime.mjs",
     "check:python-runtime": "backend\\.venv\\Scripts\\python.exe scripts\\test_python_runtime.py",

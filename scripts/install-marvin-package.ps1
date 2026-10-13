@@ -71,6 +71,23 @@ function Restore-PreviousInstall {
     Move-Item -LiteralPath $Backup -Destination $InstallRoot
 }
 
+function Stop-InstalledLauncher {
+    # Les anciens lanceurs peuvent rester sur pause après l'arrêt des serveurs.
+    # Leur répertoire courant verrouille alors le renommage Windows du dossier.
+    # Le chemin exact et le nom cmd.exe excluent les autres terminaux utilisateur.
+    $Launcher = Join-Path $InstallRoot 'start.bat'
+    $Pattern = [regex]::Escape($Launcher) + '(?=["\s]|$)'
+    foreach ($Process in @(Get-CimInstance Win32_Process -Filter "Name='cmd.exe'")) {
+        if ([string]$Process.CommandLine -notmatch $Pattern) { continue }
+        $Handle = Get-Process -Id $Process.ProcessId -ErrorAction SilentlyContinue
+        if ($null -eq $Handle) { continue }
+        try {
+            Stop-Process -Id $Handle.Id -Force -ErrorAction Stop
+            if (-not $Handle.WaitForExit(10000)) { throw 'Le lanceur precedent reste actif.' }
+        } finally { $Handle.Dispose() }
+    }
+}
+
 try {
     if (-not $SamePackage) {
         New-Item -ItemType Directory -Path $Parent -Force | Out-Null
@@ -85,6 +102,7 @@ try {
                 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Stop -AllowActiveWorkInterruption
                 if ($LASTEXITCODE -ne 0) { throw 'L ancienne installation Marvin ne peut pas etre arretee.' }
             }
+            Stop-InstalledLauncher
             Move-Item -LiteralPath $InstallRoot -Destination $Backup
             foreach ($Name in @('data', 'runtime', '.env.local')) {
                 $Old = Join-Path $Backup $Name

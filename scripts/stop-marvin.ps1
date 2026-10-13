@@ -87,6 +87,7 @@ function Get-MarvinRuntimeProcesses {
         'server_supervisor.py',
         'server_runtime.py',
         'scripts/start_next_dev.mjs',
+        (Join-Path $ProjectRoot 'start.bat'),
         'node_modules\\next\\dist\\bin\\next dev',
         'node_modules\\next\\dist\\server\\lib\\start-server.js',
         'scripts\\start-marvin-https.ps1',

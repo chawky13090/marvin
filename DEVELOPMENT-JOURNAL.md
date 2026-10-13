@@ -1,5 +1,25 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — cycle de vie du frontend distribué
+
+- L'arrêt du serveur production lancé directement par Next nécessitait le
+  repli forcé. `npm start` utilise désormais le wrapper existant avec
+  `--production`; il surveille la demande d'arrêt durable comme le mode dev,
+  sans supprimer ses caches.
+- Test réel isolé du wrapper : enfant en mode start, cache conservé, demande
+  d'arrêt consommée et code 0 dans la borne de 12 secondes.
+- Le script d'arrêt reconnaît le chemin exact `start.bat`. L'installeur ferme
+  également les anciens cmd.exe dont la commande contient ce chemin exact,
+  après l'arrêt des services, pour libérer le dossier avant renommage.
+- Le gate attend 385 étapes avec le test LibreOffice ajouté. Les assertions
+  SearXNG sont adaptées aux appels Start-Process bornés, en conservant les
+  arguments exacts de port et de compose ainsi que les délais 10 s et 900 s.
+- Tests lifecycle, readiness, parseur, SearXNG et contrat installateur exécutés.
+  Le cycle signé complet reste à rejouer sur ces sources.
+- Sécurité : seuls les cmd.exe identifiés par le chemin exact du lanceur sont
+  ciblés; aucune autre console, donnée ou secret n'est concerné.
+- Rollback : réversion atomique; aucune migration persistante.
+
 ## 2026-10-13 — v2.696.0 — démarrage distribué en production
 
 - Diagnostic : le frontend de l'installation restaurée utilisait `next dev`.

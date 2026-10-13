@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const production = process.argv.includes('--production');
 const devRoot = join(projectRoot, '.next', 'dev');
 const devLock = join(devRoot, 'lock');
 const lifecycleRoot = join(projectRoot, 'runtime', 'lifecycle');
@@ -21,14 +22,18 @@ function activeDevLock(lockPath) {
   }
 }
 
-if (activeDevLock(devLock)) {
+if (production && !existsSync(join(projectRoot, '.next', 'BUILD_ID'))) {
+  console.error('[ERREUR] Build de production absent. Relancez INSTALLER-MARVIN.bat.');
+  process.exit(2);
+}
+if (!production && activeDevLock(devLock)) {
   console.error('[BLOQUÉ] Un frontend Turbopack Marvin est déjà actif.');
   process.exit(2);
 }
 
 // Le cache de compilation reste conservé, mais le graphe de routes est reconstruit.
 // Cela répare un arrêt pendant `next build` sans toucher au code ni aux données.
-for (const relativePath of [
+for (const relativePath of production ? [] : [
   'server',
   'build-manifest.json',
   'fallback-build-manifest.json',
@@ -40,7 +45,7 @@ for (const relativePath of [
 
 const nextCli = join(projectRoot, 'node_modules', 'next', 'dist', 'bin', 'next');
 rmSync(shutdownRequest, { force: true });
-const child = spawn(process.execPath, [nextCli, 'dev', '-H', '127.0.0.1'], {
+const child = spawn(process.execPath, [nextCli, production ? 'start' : 'dev', '-H', '127.0.0.1'], {
   cwd: projectRoot,
   env: process.env,
   stdio: 'inherit',
@@ -67,7 +72,7 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
 
 child.once('error', (error) => {
   clearInterval(watcher);
-  console.error(`[ERREUR] Turbopack n'a pas démarré : ${error.message}`);
+  console.error(`[ERREUR] Next.js n'a pas démarré : ${error.message}`);
   process.exitCode = 1;
 });
 child.once('exit', (code, signal) => {

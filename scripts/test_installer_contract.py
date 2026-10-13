@@ -551,6 +551,13 @@ def _assert_uninstall_completes_and_removes_linked_rollback() -> None:
 
 def main() -> int:
     _assert_static_contract()
+    node = shutil.which("node")
+    assert node, "Node.js est requis pour verifier le cycle de vie frontend."
+    lifecycle = subprocess.run(
+        [node, "scripts/test_next_production_lifecycle.mjs"], cwd=ROOT,
+        capture_output=True, text=True, timeout=30, check=False,
+    )
+    assert lifecycle.returncode == 0, lifecycle.stderr
     _assert_plan_is_non_mutating()
     _assert_ollama_port_resolver_accepts_no_exclusions()
     _assert_loopback_waiter_is_bounded_and_retries()
