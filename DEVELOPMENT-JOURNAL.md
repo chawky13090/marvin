@@ -1,5 +1,17 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-13 — résultat réel Office direct avec streaming corrigé
+
+- Nouveau test réel sous identité administrateur du laboratoire, InstallerBackend=Direct,
+  aucune invocation WinGet. Résultat observé : code 0, LibreOffice 26.2.5.2 disponible
+  et soffice --version vérifié; diagnostic vide. Source runtime du commit 4d4eec6.
+- Le compte admin a WinGet disponible, donc Direct a sélectionné le même chemin
+  de fallback sans masquer un exécutable. Pas de certification d'interaction UAC
+  standard, de l'EXE complet, de Docker ou d'Ollama Cloud dans cette mesure.
+- Preuve minimisée installer-v2698-office-direct-result.json; aucun secret, chemin
+  utilisateur ni identifiant de session. Conserver le premier téléchargement interrompu.
+  La VM reste jetable par restauration Marvin-Clean; ne pas retirer VC++ partagé.
+
 ## 2026-10-13 — Office direct, téléchargement réel interrompu et streaming borné
 
 - Premier test réel du chemin Direct en compte administrateur de laboratoire :

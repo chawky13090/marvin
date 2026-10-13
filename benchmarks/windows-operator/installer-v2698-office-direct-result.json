@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "observed_on": "2026-10-13",
+  "source_commit": "4d4eec6",
+  "installer_backend": "Direct",
+  "winget_invoked": false,
+  "winget_available_to_lab_admin": true,
+  "elevated_lab_identity": true,
+  "interactive_uac_tested": false,
+  "exit_code": 0,
+  "capability_status": "available",
+  "libreoffice_version": "26.2.5.2",
+  "libreoffice_verified": true,
+  "full_marvin_installation_certified": false,
+  "cloud_tested": false,
+  "prior_download_attempt": "interrupted_not_certified",
+  "user_data_included": false
+}
