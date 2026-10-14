@@ -24,7 +24,10 @@ function Test-UninstallContainerOwnership([object[]]$Mounts, [string]$Root) {
 function Read-UninstallContainerInspection([string]$Output) {
     $Parts=$Output.Trim() -split '\|',2
     if($Parts.Count -ne 2 -or $Parts[0] -notmatch '^[a-f0-9]{64}$') { throw 'Identite de conteneur non confirmee.' }
-    return [pscustomobject]@{id=$Parts[0];mounts=@($Parts[1]|ConvertFrom-Json)}
+    # Windows PowerShell 5.1 emet le tableau JSON comme un objet unique dans
+    # un pipeline. L'affectation puis le cast evitent un tableau imbrique.
+    $Mounts=ConvertFrom-Json -InputObject $Parts[1]
+    return [pscustomobject]@{id=$Parts[0];mounts=[object[]]$Mounts}
 }
 
 function Invoke-UninstallDocker([string[]]$Arguments) {

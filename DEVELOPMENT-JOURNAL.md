@@ -1,5 +1,23 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-14 — v2.701, contrôle réel des montages Docker
+
+- EXE 2.700 installé avec code 0, frontend/backend vérifiés, Office PDF valide.
+  Retrait réel : code 0 et reçu final réussi, programme/rollback retirés, témoin
+  de données conservé, Docker/Office conservés; SearXNG reste présent. Ne pas
+  présenter cela comme un cycle de désinstallation complet.
+- Cause reproduite sous PS5.1 : trois montages JSON deviennent un tableau imbriqué
+  unique par le pipeline, le contrôle de propriété échoue. Décodage par affectation
+  puis cast dans le retrait; même motif corrigé avant mise à jour du paquet.
+- Test négatif/positif réel : avant count=1/owned=false, après count=3/owned=true;
+  volumes anonymes restent exclus de la propriété. Aucun secret ni donnée utilisateur
+  dans les observations; reçu existant et logs bornés inchangés. Aucun nouveau log.
+- Le lecteur du harnais a aussi été corrigé pour les messages humains précédant
+  le JSON; les préconditions ID du voisin/empreinte du témoin seront écrites avant
+  le prochain run. Le résultat 2.700 est immuable et séparé du nouveau gel.
+- Retour code par réversion du commit; état laboratoire par disque/checkpoint
+  originaux conservés. Nouveau paquet gelé et test VM requis. TD-017 reste ouvert.
+
 ## 2026-10-14 — v2.700, gel du correctif de désinstallation
 
 - Version des métadonnées alignée sur 2.700.0. Modification limitée à l'arrêt

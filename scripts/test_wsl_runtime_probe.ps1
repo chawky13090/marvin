@@ -36,6 +36,13 @@ $Definition=$UninstallAst.Find({param($Node) $Node -is [Management.Automation.La
 $Id=('a'*64)
 $Parsed=Read-UninstallContainerInspection ($Id+'|[{"Type":"bind","Source":"C:\\Marvin\\settings.yml"}]')
 if($Parsed.id -ne $Id -or -not(Test-UninstallContainerOwnership $Parsed.mounts 'C:\Marvin')){throw 'Inspection propre mal parse.'}
+$Parsed=Read-UninstallContainerInspection ($Id+'|[{"Type":"volume","Source":"/var/cache"},{"Type":"bind","Source":"C:\\Marvin\\settings.yml"},{"Type":"volume","Source":"/var/etc"}]')
+if($Parsed.mounts.Count -ne 3 -or -not(Test-UninstallContainerOwnership $Parsed.mounts 'C:\Marvin')){throw 'Tableau multi-montages imbrique ou montage propre perdu.'}
+$UpdateAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'install-marvin-package.ps1'),[ref]$Tokens,[ref]$Errors)
+$Definition=$UpdateAst.Find({param($Node) $Node -is [Management.Automation.Language.FunctionDefinitionAst] -and $Node.Name -eq 'Test-InstallationMount'},$true)
+. ([scriptblock]::Create($Definition.Extent.Text))
+$InstallRoot='C:\Marvin'
+if(-not(Test-InstallationMount $Parsed.mounts)){throw 'Mise a jour ne reconnait pas le montage propre parmi plusieurs montages.'}
 $Rejected=$false
 try{Read-UninstallContainerInspection 'not-an-id|[]'|Out-Null}catch{$Rejected=$true}
 if(-not$Rejected){throw 'Identite invalide acceptee.'}

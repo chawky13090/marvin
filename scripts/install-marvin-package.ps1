@@ -137,7 +137,7 @@ function Stop-ManagedSearxngForUpdate {
     if (-not (Test-Path -LiteralPath $Docker -PathType Leaf)) { return }
     $Inspection = Invoke-LocalDocker -Arguments @('inspect','--format','"{{json .Mounts}}"','marvin-searxng')
     if ($Inspection.exit_code -ne 0) { return }
-    $Mounts = @($Inspection.output | ConvertFrom-Json)
+    $Mounts = ConvertFrom-Json -InputObject $Inspection.output
     if (-not (Test-InstallationMount $Mounts)) { return }
     $Stopped = Invoke-LocalDocker -Arguments @('stop','--time','20','marvin-searxng')
     if ($Stopped.exit_code -ne 0) { throw 'Le conteneur SearXNG gere ne peut pas etre arrete pour la mise a jour.' }

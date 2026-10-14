@@ -1,0 +1,36 @@
+{
+  "schema": "marvin.installer-lab-observation/1",
+  "observed_date": "2026-10-14",
+  "source_commit": "c62e743861ba74008529cc4da511e97b89c8d392",
+  "exe_sha256": "3ffefcfeae7e4cc9a36b95a5af05bf2b7879e36f6c78b479e364e25c1ab9f720",
+  "install_exit_code": 0,
+  "backend_version": "2.700.0",
+  "frontend_http_status": 200,
+  "searxng_engines": 80,
+  "searxng_results": 73,
+  "office_conversion_exit_code": 0,
+  "local_agent_probe_qualified": true,
+  "local_context_calibration": "degraded",
+  "cloud_authentication_tested": false,
+  "uninstall": {
+    "native_exit_code": 0,
+    "completion_receipt_success": true,
+    "program_removed": true,
+    "rollback_directory_removed": true,
+    "synthetic_data_preserved": true,
+    "shared_docker_preserved": true,
+    "shared_office_preserved": true,
+    "managed_container_removed": false,
+    "neighbor_fixtures_observed": 5,
+    "exact_neighbor_id_comparison": "unassessed",
+    "harness_receipt_parser_failed": true
+  },
+  "qualification": "partial_container_cleanup_failed",
+  "identified_cause": "powershell_5_1_json_array_nested_in_pipeline",
+  "candidate_parser_regression": {
+    "before_mount_count": 1,
+    "before_owned": false,
+    "after_mount_count": 3,
+    "after_owned": true
+  }
+}
