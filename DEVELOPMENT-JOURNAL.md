@@ -1,5 +1,53 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-14 — v2.700, gel du correctif de désinstallation
+
+- Version des métadonnées alignée sur 2.700.0. Modification limitée à l'arrêt
+  des processus résiduels; aucune migration ni reconfiguration de modèle.
+- Architecture et documentation vérifiées; suite installateur et sonde réelle
+  de processus validées avant packaging. EXE construit depuis commit suivi propre,
+  signature privée existante, aucun secret ou fichier non suivi embarqué.
+- Validation VM du paquet signé attendue séparément avant annonce de qualification.
+  Rollback code : réversion du commit v2.700; données de laboratoire : disque
+  original et checkpoint Marvin-Clean conservés. Le retrait préserve les données.
+
+## 2026-10-14 — cycle installateur, correctif non reexporté
+
+- Qwen3 1.7B qualifié séparément sur VM 8 Gio : 3/3 sondes locales, 28,7 s
+  à froid, médiane chaude 21,7 s. Aucun outil métier. Le résultat dégradé
+  d'installation reste immuable. La RAM libre 3,2 puis 1,8 Gio fait varier
+  l'admissibilité du modèle; aucun défaut Wi-Fi établi pour cette sélection.
+- Restart-Computer non évalué (PS Direct indisponible), récupération électrique
+  du clone jetable. Puis arrêt propre/démarrage froid : backend/frontend 200,
+  SearXNG 80 moteurs/75 résultats, PDF LibreOffice valide. Secret LSA supprimé.
+- Désinstallation 2.699 interrompue par taskkill sur un enfant déjà disparu.
+  Deux essais préalables étaient des défauts du harnais (policy/Confirm), pas
+  du produit. Les données restent intactes, conteneurs témoins dans le clone.
+- Correctif candidat : identité PID+CreationDate, absence tolérée, taskkill système
+  borné et postcondition obligatoire. Aucun nouveau stockage/log produit : reçu
+  existant, pas de stderr brut ni secret, temporaires retirés. Rollback du code
+  par patch inverse; laboratoire par disque original/checkpoint conservés.
+- Tests réellement réussis : scripts/test_wsl_runtime_probe.ps1 (inclut processus
+  témoin arrêté puis déjà absent), scripts/test_installer_contract.py.
+- Correctif absent de l'EXE livré : nouveau gel/paquet et rejeu VM requis.
+  Preuve séparée : installer-v2699-lifecycle-followup.json. Suivi TD-017.
+
+## 2026-10-14 — observation de l'EXE v2.699 en VM 90 Gio
+
+- EXE du commit 802846b exécuté sans modification du paquet : code 0,
+  backend 2.699.0 et frontend HTTP 200. SearXNG : 80 moteurs, 76 résultats.
+- LibreOffice 26.2.5.2 convertit un fixture texte non personnel en PDF valide.
+- Le plan local et l'inventaire ne contiennent que nomic-embed-text : aucun
+  agent n'a été testé. Statut dégradé conservé; Wi-Fi non établi comme cause.
+- Une tentative antérieure attendait dans l'étape Docker; état/log conservés.
+  L'attente de licence est une hypothèse, pas une cause démontrée.
+- VM bornée à 90 Gio conformément au choix propriétaire. Partition Recovery
+  conservée, volume F de laboratoire et déplacement des caches sans suppression.
+  Retour : VM arrêtée, rattacher le disque original conservé ou Marvin-Clean.
+- Aucun changement produit, secret ou contenu utilisateur dans la preuve.
+  Contrôles après reboot, désinstallation de cet EXE et accès Cloud restent ouverts.
+  Preuve : benchmarks/windows-operator/installer-v2699-full-vm-result.json.
+
 ## 2026-10-13 — v2.699, prerequisites et retrait Docker fermés
 
 - La VM Win11 a montré un lanceur WSL sans runtime, malgré le probe ancien

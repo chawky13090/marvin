@@ -193,7 +193,10 @@ def _assert_static_contract() -> None:
     assert "function Remove-Bounded" in uninstaller
     assert "[IO.Directory]::Delete(`$Path, `$true)" in uninstaller
     assert "$ProtectedProcessIds" in uninstaller and "residual_process_ids_stopped" in uninstaller
-    assert "taskkill.exe /PID ([int]$Process.ProcessId) /T /F" in uninstaller
+    assert "Stop-UninstallProcessSnapshot $Process" in uninstaller
+    assert "Test-UninstallProcessIdentity $Snapshot $After" in uninstaller
+    assert "$Snapshot.CreationDate -eq $Current.CreationDate" in uninstaller
+    assert "$Killer.WaitForExit(10000)" in uninstaller
     assert "removal_errors = `$RemovalErrors" in uninstaller
     assert "completion_receipt" in uninstaller and "completion_pending = $true" in uninstaller
     assert "VMCheckpoint" in vm_qualification

@@ -2,7 +2,7 @@
 
 > **But de ce fichier** : permettre à *n'importe quelle* instance de Codex, sur *n'importe quelle* machine, de reprendre le développement de Marvin immédiatement, sans perdre le contexte. À lire en entier au démarrage d'une session.
 
-> **État courant : v2.699.0, 364 outils, 400 routes.** Architecture dans
+> **État courant : v2.700.0, 364 outils, 400 routes.** Architecture dans
 > `ARCHITECTURE.md`; dette ouverte dans `docs/TECHNICAL-DEBT.md`.
 
 ---
@@ -46,7 +46,7 @@ justifiée, bornée et planifiée; un domaine ne peut pas être déclaré vérif
 | LLM | Ollama | **11434 ou repli local dynamique** | service Ollama |
 | Vecteurs | Qdrant (mode local fichier) | — | embarqué dans le process backend |
 
-- **Version backend** : `2.699.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
+- **Version backend** : `2.700.0`, centralisée dans `backend/app_version.py` et exposée par **`/api/health`** ainsi que par les métadonnées FastAPI.
 - **URL backend côté frontend** (dynamique, pour marcher en LAN/mobile) :
   `(typeof window!=='undefined' && window.location) ? proto+'//'+hostname+':8005' : (env || 'http://127.0.0.1:8005')`.
 
@@ -227,7 +227,15 @@ Les compétences de Marvin sont des fichiers **Markdown** dans `data/skills/*.md
 
 ---
 
-## 9. État actuel (v2.699.0)
+## 9. État actuel (v2.700.0)
+
+**v2.700 (désinstallation et courses de processus)** : le retrait vérifie l'identité
+PID/CreationDate avant l'arrêt et la disparition effective ensuite. Un enfant déjà
+terminé par l'arrêt de son parent n'est plus une erreur; un PID réutilisé n'est pas
+sélectionné. Taskkill utilise le chemin système et une attente bornée à dix secondes.
+L'EXE 2.699 et ses preuves restent conservés. Tests unitaires et processus témoin
+réels réussis; la qualification du nouveau paquet en VM reste distincte. Aucun
+schéma ni donnée produit n'est migré. Rollback : réversion atomique de v2.700.
 
 **v2.699 (WSL et retrait Docker calculables)** : le probe WSL exige une ligne de
 version reelle >=2.1.5, pas une aide non vide. Full exige un Windows client compatible

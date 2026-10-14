@@ -1,0 +1,43 @@
+{
+  "schema": "marvin.installer-lab-observation/1",
+  "observed_date": "2026-10-14",
+  "source_commit": "802846b48ab6c02b39137b498a1dfa087b2a9b72",
+  "prior_result_sha256": "657494199af1234ca0319e9cee6970ca7f803dbd132d5267485797c000321424",
+  "prior_result_modified": false,
+  "agent_probe": {
+    "model": "qwen3:1.7b",
+    "digest": "8f68893c685c3ddff2aa3fffce2aa60a30bb2da65ca488b61fff134a4d1730e7",
+    "vm_memory_bytes": 8589934592,
+    "repetitions": 3,
+    "successes": 3,
+    "cold_latency_ms": 28681.7,
+    "median_warm_latency_ms": 21706.4,
+    "business_actions_executed": false,
+    "broad_agent_quality_certified": false,
+    "original_installer_model_stage_promoted": false
+  },
+  "cold_start": {
+    "graceful_power_off_and_start_observed": true,
+    "standard_interactive_launcher_used": true,
+    "backend_http_status": 200,
+    "frontend_http_status": 200,
+    "searxng_engines": 80,
+    "searxng_results": 75,
+    "office_conversion_exit_code": 0,
+    "temporary_lsa_secret_removed": true,
+    "prior_restart_attempt_unassessed": true,
+    "forced_recovery_before_cold_start": true
+  },
+  "original_exe_uninstall": {
+    "status": "failed_locked",
+    "cause": "taskkill_missing_child_native_error_after_process_tree_termination",
+    "data_removal_completed": false
+  },
+  "candidate_fix": {
+    "included_in_delivered_exe": false,
+    "identity_and_absent_process_tests_passed": true,
+    "owned_process_runtime_test_passed": true,
+    "installer_contract_suite_passed": true,
+    "fresh_signed_exe_vm_uninstall_tested": false
+  }
+}

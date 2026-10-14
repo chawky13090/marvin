@@ -40,3 +40,22 @@ $Rejected=$false
 try{Read-UninstallContainerInspection 'not-an-id|[]'|Out-Null}catch{$Rejected=$true}
 if(-not$Rejected){throw 'Identite invalide acceptee.'}
 Write-Output 'Docker policy OK - privileges par backend et ownership des montages.'
+$Definition=$UninstallAst.Find({param($Node) $Node -is [Management.Automation.Language.FunctionDefinitionAst] -and $Node.Name -eq 'Test-UninstallProcessIdentity'},$true)
+. ([scriptblock]::Create($Definition.Extent.Text))
+$Snapshot=[pscustomobject]@{ProcessId=123;CreationDate=[datetime]'2026-10-14T01:00:00'}
+if(Test-UninstallProcessIdentity $Snapshot $null){throw 'Processus disparu considere vivant.'}
+if(Test-UninstallProcessIdentity $Snapshot ([pscustomobject]@{ProcessId=123;CreationDate=[datetime]'2026-10-14T02:00:00'})){throw 'PID reutilise accepte.'}
+if(-not(Test-UninstallProcessIdentity $Snapshot $Snapshot)){throw 'Identite courante refusee.'}
+Write-Output 'Uninstall identity OK - absence et reutilisation de PID distingues.'
+$Definition=$UninstallAst.Find({param($Node) $Node -is [Management.Automation.Language.FunctionDefinitionAst] -and $Node.Name -eq 'Stop-UninstallProcessSnapshot'},$true)
+. ([scriptblock]::Create($Definition.Extent.Text))
+$OwnedFixture=Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile','-Command','Start-Sleep -Seconds 60') -WindowStyle Hidden -PassThru
+try {
+    $Snapshot=Get-CimInstance Win32_Process -Filter ("ProcessId = " + $OwnedFixture.Id) -ErrorAction Stop
+    if(-not(Stop-UninstallProcessSnapshot $Snapshot)){throw 'Processus temoin non arrete.'}
+    if(Stop-UninstallProcessSnapshot $Snapshot){throw 'Processus deja termine marque comme nouvel arret.'}
+} finally {
+    if(-not $OwnedFixture.HasExited){$OwnedFixture.Kill()}
+    $OwnedFixture.Dispose()
+}
+Write-Output 'Uninstall runtime OK - processus temoin arrete puis absence toleree.'

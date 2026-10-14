@@ -1,0 +1,48 @@
+{
+  "schema": "marvin.installer-lab-observation/1",
+  "observed_date": "2026-10-14",
+  "source_commit": "802846b48ab6c02b39137b498a1dfa087b2a9b72",
+  "exe_sha256": "a823b594ca15a2acd13badb98a4b9f6b5f34ebaebcfc0e7e0ab1e935a7ad96a0",
+  "vm_disk_bytes": 96636764160,
+  "vm_memory_bytes": 8589934592,
+  "installation_exit_code": 0,
+  "installation_status": "completed",
+  "backend_version": "2.699.0",
+  "backend_status": "ok",
+  "frontend_http_status": 200,
+  "searxng_engines": 80,
+  "searxng_results_observed": 76,
+  "libreoffice_version": "26.2.5.2",
+  "office_conversion": {
+    "exit_code": 0,
+    "pdf_header_verified": true,
+    "pdf_bytes": 14600,
+    "sha256": "b86630997ca97ec59711a8f27a134cd8361208c89c1bf501ff6b98e1aa031112",
+    "fixture_contains_user_data": false
+  },
+  "local_agent": {
+    "status": "degraded",
+    "qualification_artifact_present": false,
+    "planned_models": ["nomic-embed-text"],
+    "installed_models": ["nomic-embed-text:latest"],
+    "agent_inference_tested": false,
+    "network_failure_as_cause_confirmed": false
+  },
+  "limitations": {
+    "fresh_prerequisite_uac_path_verified": false,
+    "cloud_authentication_tested": false,
+    "post_reboot_verified": false,
+    "uninstall_verified_for_this_exe": false,
+    "all_features_verified": false
+  },
+  "earlier_attempt": {
+    "aborted": true,
+    "stage": "docker_and_searxng_required",
+    "interactive_license_wait": "probable_not_confirmed",
+    "state_and_log_preserved_in_guest": true
+  },
+  "rollback": {
+    "original_disk_chain_retained": true,
+    "Marvin-Clean_checkpoint_retained": true
+  }
+}

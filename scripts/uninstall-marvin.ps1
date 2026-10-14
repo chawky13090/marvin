@@ -44,6 +44,33 @@ function Invoke-UninstallDocker([string[]]$Arguments) {
         Remove-Item -LiteralPath $Out,$Err -Force
     }
 }
+
+function Test-UninstallProcessIdentity([object]$Snapshot, [object]$Current) {
+    return $null -ne $Current -and
+        [int]$Snapshot.ProcessId -eq [int]$Current.ProcessId -and
+        $Snapshot.CreationDate -eq $Current.CreationDate
+}
+
+function Stop-UninstallProcessSnapshot([object]$Snapshot) {
+    $ProcessId=[int]$Snapshot.ProcessId
+    $Current=Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction Stop
+    if(-not (Test-UninstallProcessIdentity $Snapshot $Current)){return $false}
+    $Out=[IO.Path]::GetTempFileName();$Err=[IO.Path]::GetTempFileName();$Killer=$null
+    try {
+        $Killer=Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\taskkill.exe') -ArgumentList @('/PID',[string]$ProcessId,'/T','/F') -WindowStyle Hidden -PassThru -RedirectStandardOutput $Out -RedirectStandardError $Err
+        $null=$Killer.Handle
+        if(-not $Killer.WaitForExit(10000)){throw 'Arret de processus non confirme dans le delai; suppression suspendue.'}
+        $Killer.WaitForExit()
+        $After=Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction Stop
+        # Un parent peut avoir deja termine cet enfant. La postcondition compte,
+        # pas le stderr de taskkill; un PID reutilise ne doit jamais etre retue.
+        if(Test-UninstallProcessIdentity $Snapshot $After){throw 'Processus Marvin encore actif; suppression suspendue.'}
+        return $true
+    } finally {
+        if($Killer){$Killer.Dispose()}
+        Remove-Item -LiteralPath $Out,$Err -Force -ErrorAction SilentlyContinue
+    }
+}
 if (-not (Test-Path -LiteralPath $Marker -PathType Leaf)) { throw 'Marqueur d installation Marvin absent; suppression automatique refusee.' }
 if ($ProjectRoot -eq [IO.Path]::GetPathRoot($ProjectRoot) -or $ProjectRoot.Length -lt ($LocalAppData.Length + 4)) {
     throw 'Racine Marvin dangereuse; suppression refusee.'
@@ -67,8 +94,7 @@ foreach ($Process in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContin
     if ($ProtectedProcessIds.Contains([int]$Process.ProcessId)) { continue }
     $CommandLine = [string]$Process.CommandLine
     if ($CommandLine.IndexOf($ProjectRoot, [StringComparison]::OrdinalIgnoreCase) -lt 0) { continue }
-    & taskkill.exe /PID ([int]$Process.ProcessId) /T /F 2>$null | Out-Null
-    $ResidualProcessIds += [int]$Process.ProcessId
+    if(Stop-UninstallProcessSnapshot $Process){$ResidualProcessIds += [int]$Process.ProcessId}
 }
 
 Unregister-ScheduledTask -TaskName 'Marvin - Demarrage automatique' -Confirm:$false -ErrorAction SilentlyContinue
