@@ -1,0 +1,72 @@
+{
+  "schema": "marvin.installer-lab-observation/1",
+  "observed_date": "2026-10-14",
+  "source_commit": "75361c08d8986a354ae06bd293531f01eb7fa0d7",
+  "exe_sha256": "24be63590df2c1920097a4b2385425f67237bc59439ed44a10ffddbe7ad830c3",
+  "private_signature_valid_in_guest": true,
+  "public_microsoft_trust": false,
+  "installation": {
+    "exit_code": 0,
+    "status": "completed",
+    "backend_version": "2.701.0",
+    "backend_status": "ok",
+    "frontend_http_status": 200,
+    "searxng_results": 71,
+    "searxng_engines": 80,
+    "libreoffice_version": "26.2.5.2",
+    "office_conversion_exit_code": 0,
+    "office_pdf_bytes": 14600,
+    "office_pdf_sha256": "135a603e039db57428cf41b007c709dc345b0783e3737a116d97794c871c09f5",
+    "local_model_stage": "succeeded",
+    "agent_probe_model": "qwen3.5:0.8b",
+    "agent_probe_successes": 3,
+    "agent_probe_repetitions": 3,
+    "agent_probe_cold_ms": 17516.3,
+    "agent_probe_median_warm_ms": 7560.1
+  },
+  "uninstall": {
+    "native_exit_code": 0,
+    "completion_receipt_success": true,
+    "program_removed": true,
+    "synthetic_data_preserved_by_sha256": true,
+    "neighbor_container_preserved_by_exact_id": true,
+    "witness_preconditions_written_before_uninstall": true,
+    "managed_container_removed": true,
+    "shared_docker_preserved": true,
+    "shared_office_preserved": true
+  },
+  "lab_preparation": {
+    "vm_memory_bytes_during_test": 8589934592,
+    "vm_disk_bytes": 96636764160,
+    "disk_threshold_lowered": false,
+    "archived_models_moved_to_secondary_lab_volume": true,
+    "archive_sha256_verified": true,
+    "temporary_paging_configuration_used": true,
+    "paging_policy_restored_after_test": true,
+    "legacy_v2700_container_removed_after_exact_bind_ownership_check": true,
+    "legacy_empty_generated_settings_directory_removed": true,
+    "docker_volumes_removed_during_recovery": false,
+    "package_sources_modified_in_guest": false
+  },
+  "failed_attempts_retained": ["disk_preflight", "legacy_bind_directory"],
+  "after_test": {
+    "vm_state": "Off",
+    "dynamic_memory": true,
+    "minimum_memory_bytes": 3221225472,
+    "startup_memory_bytes": 4294967296,
+    "maximum_memory_bytes": 6442450944,
+    "disk_bytes_retained": 96636764160,
+    "temporary_lsa_secret_removed": true,
+    "lab_launch_tasks_removed": true,
+    "original_disk_and_checkpoint_retained": true,
+    "e7_environment_configuration_test_passed": true
+  },
+  "limitations": {
+    "single_windows11_vm_functional_smoke_only": true,
+    "fresh_prerequisite_uac_path_tested": false,
+    "cloud_authentication_tested": false,
+    "v2701_post_reboot_full_cycle_tested": false,
+    "all_364_tools_certified": false,
+    "e7_certification_granted": false
+  }
+}

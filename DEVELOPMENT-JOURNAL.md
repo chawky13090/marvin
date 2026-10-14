@@ -1,5 +1,31 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-14 — résultat fonctionnel du paquet signé v2.701
+
+- Source gelée 75361c0; EXE SHA-256 24be6359...ad830c3, signature privée
+  Valid dans la VM. Installation code 0, backend 2.701, frontend 200,
+  SearXNG 80 moteurs/71 résultats et PDF LibreOffice valide.
+- Modèle local qwen3.5 0.8B : 3/3 sondes protocolaires et calibration réussie.
+  Cela ne certifie ni l'intelligence générale ni les 364 outils.
+- Retrait réel du paquet : code 0 et reçu final réussi, programme retiré,
+  témoin SHA-256 conservé, voisin ID exact conservé, SearXNG retiré;
+  Docker et LibreOffice partagés restent installés.
+- Deux tentatives échouées conservées : seuil disque et bind hérité 2.700.
+  Réparation de laboratoire par ID et source bind exacts, dossier settings.yml
+  vide retiré sans récursion; aucun volume ni conteneur étranger supprimé.
+- VM limitée à 90 Gio : archives modèles déplacées sur F avec SHA avant/après;
+  pagination temporaire, puis politique Windows initiale restaurée. L'EXE n'a
+  reçu ni chemin F ni configuration de pagination. Secret LSA retiré et tâches
+  de lancement de test supprimées. VM Off, mémoire dynamique 3/4/6 Gio;
+  contrôle E7 de configuration réussi, disque original/checkpoint conservés.
+- Portée : une VM Windows 11 avec prérequis déjà installés, pas une attestation
+  de toutes les éditions Windows ni de Cloud; pas de nouveau cycle reboot 2.701.
+  Aucune source du paquet modifiée pendant le test. Résultats publics sans contenu
+  utilisateur ni secret; logs temporaires conservés seulement dans le laboratoire.
+- Preuve : benchmarks/windows-operator/installer-v2701-result.json. Retour code :
+  revert 75361c0 puis c62e743 si nécessaire; retour labo : clone original/checkpoint,
+  avec vérification et retrait de tout auto-logon temporaire après restauration.
+
 ## 2026-10-14 — v2.701, contrôle réel des montages Docker
 
 - EXE 2.700 installé avec code 0, frontend/backend vérifiés, Office PDF valide.
