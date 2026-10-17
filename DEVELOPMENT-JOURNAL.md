@@ -1,5 +1,95 @@
 # Journal portable de développement de Marvin
 
+## 2026-10-16 — préflight de qualification Windows vierge, capacité insuffisante
+
+- EXE 2.701 toujours SHA-256 24be6359...ad830c3. ISO Windows présente.
+  Le checkpoint Marvin-Clean ne constitue pas une cible vierge : son script de
+  finalisation exige déjà Python, Node, Git, Go et .NET. Ne pas lancer le script
+  de recréation existant : il détruirait le laboratoire et son rollback.
+- Hôte : 54 036 119 552 octets libres; VM équipée : 52 583 989 248 octets
+  alloués. La différence ne laisse pas une réserve d'exploitation suffisante
+  pour une seconde installation comparable. C'est une estimation de capacité,
+  pas une mesure d'une nouvelle VM. Aucun disque ou fichier utilisateur supprimé.
+- Alternatives : réutiliser la cible provisionnée (rejeté, faux Windows vierge),
+  ou créer une cible indépendante après libération de capacité/support distinct
+  (retenu). Le laboratoire existant reste Off et intact, taille virtuelle 90 Gio.
+- Préflight conservé dans installer-v2701-pristine-preflight.json; aucune preuve
+  de qualification complète ni UAC fraîche accordée. Suite conditionnée à l'espace
+  disponible; les connexions propriétaire et confirmations UAC restent explicites.
+- Aucun changement produit, secret, log métier ou migration; aucun rollback requis
+  au-delà du retrait des nouveaux documents, l'état des VM n'ayant pas changé.
+
+## 2026-10-16 — pip réel interrompu dans la VM Windows
+
+- Sonde autonome transférée dans Marvin-Windows11-TestForge; Python 3.13.15,
+  vrai pip, wheel synthétique de 4 Mio sans dépendance ni script d'installation.
+  Serveur lié exclusivement à 127.0.0.1; réponse HTTP annoncée complète puis
+  coupée après 1 Kio. Aucun accès Internet ni modification réseau de l'hôte.
+- Résultat : six requêtes interrompues, code pip 1, aucun module installé;
+  serveur rétabli, une requête, code 0 et module égal à la pré-image synthétique.
+  Le nombre de reprises propres à pip est observé, non déduit de `--retries 0`.
+- Arrêt puis démarrage contrôlés de la VM après succès : SHA-256 du témoin
+  revalidé. La première connexion PowerShell Direct pendant le démarrage initial
+  a échoué; le second essai a réussi. Ce n'est pas un échec du téléchargement.
+- Résultat dans `benchmarks/windows-operator/installer-pip-recovery-20261016.json`,
+  lié au SHA-256 de la sonde. Ce test n'exécute pas l'EXE ni le requirements réel,
+  ne coupe pas Windows pendant une mutation, et ne certifie ni npm ni Ollama.
+- Données/logs : uniquement paquets et journaux synthétiques sous
+  `C:\Marvin\NetworkRecovery-20261016` dans la VM. Serveur fermé en finally,
+  sous-processus limités à 90 s; aucun secret dans la sonde ou la preuve.
+  Témoin conservé pour audit; aucun nouveau magasin ni événement produit.
+- Rollback : aucune configuration système modifiée; retrait possible du seul
+  dossier synthétique après vérification du chemin exact. EXE v2.701 inchangé,
+  TD-017 reste ouverte. La VM est remise à l'arrêt après les observations.
+
+## 2026-10-16 — rollback des dépendances sous panne injectée
+
+- Les corps réels des étapes `backend_dependencies` et `frontend_dependencies`
+  sont extraits par AST sans exécuter le point d'entrée de l'installateur.
+  Les seuls appels externes sont remplacés par des doubles synthétiques.
+- Test observé : 24 injections/rejeux, sur création venv, mise à jour pip,
+  installation requirements, pip check, npm ci et contrôle Node; avec puis sans
+  environnement antérieur. Les erreurs remontent, les octets témoins précédents
+  sont restaurés, aucun environnement partiel ni dossier rollback ne subsiste.
+- Un rejeu frontend synthétique sans panne valide aussi le chemin positif.
+  Cela ne prouve ni une coupure réseau physique, ni les effets internes réels
+  de pip/npm, ni une interruption brutale de Windows. L'EXE reste inchangé.
+- Test ajouté au contrat installateur existant. Test du gestionnaire de modèles
+  local existant réussi (confirmation, allowlist, progression, idempotence), sans
+  l'assimiler à une preuve de reprise réseau du téléchargement Ollama.
+- Suite complète `backend/.venv/Scripts/python.exe scripts/test_installer_contract.py`
+  réussie; architecture, documentation et contrôle des espaces Git réussis.
+- Sécurité/logs : aucune connexion réseau, aucun secret ni donnée réelle;
+  fichiers sous une racine temporaire absolue vérifiée, restauration de la seule
+  variable npm modifiée, nettoyage en finally. Aucun nouvel événement produit.
+- Rollback : retirer le test et son appel ensemble; aucune migration persistante.
+  TD-017 reste ouverte pour la qualification runtime et la matrice Windows.
+
+## 2026-10-15 — reprise des téléchargements installateur sous panne simulée
+
+- Source produit inchangée : le helper réel `Get-VerifiedDownload` est extrait par
+  AST et exécuté sous Windows PowerShell contre un serveur HTTP local temporaire.
+- Résultat observé : première réponse coupée après 100 octets, reprise complète
+  réussie, cache valide réutilisé sans requête, cache corrompu retéléchargé;
+  trois réponses corrompues refusées, aucun fichier final invalide ni `.part`
+  conservé et aucun reçu de téléchargement ajouté pour l'échec.
+- Le test est appelé par `scripts/test_installer_contract.py`. Ce contrôle ne
+  prouve pas la reprise globale après redémarrage, les téléchargements pip/npm,
+  Docker ou une coupure Wi-Fi réelle. TD-017 reste ouverte.
+- Validations observées : test réseau isolé, compilation Python, architecture,
+  documentation et `git diff --check` réussis. La suite installateur exécutée
+  avec Python 3.13 système atteint le scénario de processus enfant puis s'arrête
+  sur `ModuleNotFoundError: psutil`; elle n'est donc pas déclarée réussie.
+- Rejeu avec `backend/.venv/Scripts/python.exe` : suite installateur complète
+  réussie, y compris le nouveau test réseau. L'échec précédent est conservé
+  comme erreur de choix d'environnement, sans installation de dépendance globale.
+- Sécurité et journalisation : écoute sur loopback/port éphémère, charges purement
+  synthétiques, aucun secret, accès Internet, installation ou réglage système.
+  Serveur fermé et répertoire temporaire nettoyé en finally; attente subprocess
+  limitée à 60 secondes. Aucun nouvel événement produit ni stockage persistant.
+- Rollback : retirer le test et son appel ensemble; aucune migration ni donnée
+  produit modifiée. L'EXE v2.701 et ses empreintes demeurent inchangés.
+
 ## 2026-10-14 — résultat fonctionnel du paquet signé v2.701
 
 - Source gelée 75361c0; EXE SHA-256 24be6359...ad830c3, signature privée

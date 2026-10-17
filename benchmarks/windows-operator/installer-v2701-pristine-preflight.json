@@ -1,0 +1,23 @@
+{
+  "schema": "marvin.installer-pristine-preflight/1",
+  "observed_date": "2026-10-16",
+  "status": "blocked_resources",
+  "exe_sha256": "24be63590df2c1920097a4b2385425f67237bc59439ed44a10ffddbe7ad830c3",
+  "observations": {
+    "host_free_bytes": 54036119552,
+    "existing_vm_allocated_bytes": 52583989248,
+    "existing_vm_state": "Off",
+    "windows_installation_iso_present": true,
+    "existing_clean_checkpoint_has_python_and_node": true
+  },
+  "decision": {
+    "preserve_existing_vm_and_rollback": true,
+    "reuse_provisioned_checkpoint_as_pristine_forbidden": true,
+    "automatic_deletion_of_user_files_authorized": false,
+    "new_full_vm_created": false,
+    "fresh_prerequisite_installation_tested": false,
+    "interactive_uac_tested": false,
+    "full_qualification_granted": false,
+    "capacity_comparison_is_planning_estimate_not_new_vm_measurement": true
+  }
+}

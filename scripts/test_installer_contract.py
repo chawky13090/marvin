@@ -643,6 +643,10 @@ def _assert_managed_ollama_update_is_scoped() -> None:
 
 def main() -> int:
     _assert_static_contract()
+    from test_installer_download_recovery import main as check_download_recovery
+    assert check_download_recovery() == 0
+    dependency_recovery = _run_powershell(ROOT / 'scripts/test_installer_dependency_recovery.ps1')
+    assert dependency_recovery.returncode == 0, dependency_recovery.stdout + dependency_recovery.stderr
     _assert_managed_ollama_update_is_scoped()
     node = shutil.which("node")
     assert node, "Node.js est requis pour verifier le cycle de vie frontend."

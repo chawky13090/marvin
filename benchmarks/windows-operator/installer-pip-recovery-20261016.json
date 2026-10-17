@@ -1,0 +1,37 @@
+{
+  "schema": "marvin.installer-lab-observation/1",
+  "observed_date": "2026-10-16",
+  "product_source_commit": "75361c08d8986a354ae06bd293531f01eb7fa0d7",
+  "probe_path": "scripts/test_installer_pip_network_recovery.py",
+  "probe_sha256": "2244ad574fa0d61229bdea90a117f8f7932d6e13ae84945029197af5d93c47b7",
+  "vm": "Marvin-Windows11-TestForge",
+  "python_version": "3.13.15",
+  "observations": {
+    "interrupted_exit_code": 1,
+    "retry_exit_code": 0,
+    "broken_requests": 6,
+    "healthy_requests": 1,
+    "module_sha256": "e7d3daec072e92b835703c4f7d5a620f314605bc7632464d1dcf42d1db64f55a",
+    "wheel_sha256": "866e4226e704d417a72845a630a9bf4ece39224c35ddafa46da06b99d1dd789b",
+    "no_module_installed_after_interrupted_transfer": true,
+    "module_bytes_equal_fixture_after_retry": true,
+    "post_reboot_witness_verified": true
+  },
+  "isolation": {
+    "real_pip": true,
+    "loopback_only": true,
+    "synthetic_wheel_only": true,
+    "system_packages_modified": false,
+    "host_network_modified": false,
+    "temporary_server_stopped": true,
+    "synthetic_witness_retained_in_vm": true
+  },
+  "limitations": {
+    "standalone_pip_target_not_full_installer": true,
+    "reboot_after_success_not_during_transfer": true,
+    "npm_network_recovery_tested": false,
+    "ollama_network_recovery_tested": false,
+    "full_installer_resume_certified": false,
+    "e7_certification_granted": false
+  }
+}
